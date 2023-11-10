@@ -115,12 +115,12 @@ def loadUi(uifile, baseinstance=None, customWidgets=None,
     widget = loader.load(uifile)
     QMetaObject.connectSlotsByName(widget)
     return widget
+
+
 class PhotoViewer(QGraphicsView):
     photoClicked = Signal(QPoint)
     endDrawing_rect = Signal()
-    end_pluspoint_selection = Signal()
-    end_minpoint_selection = Signal()
-    endDrawing_line_meas = Signal()
+    endDrawing_line_meas = Signal(QGraphicsLineItem, QGraphicsTextItem)
 
     def __init__(self, parent):
         super(PhotoViewer, self).__init__(parent)
@@ -149,9 +149,13 @@ class PhotoViewer(QGraphicsView):
         self.setMouseTracking(True)
         self.origin = QPoint()
 
+        # tool activation
+        self.line_meas = False
+
+        # current items
         self._current_point = None
-        self.measure_length = False
-        self._current_line = None
+        self._current_line_item = None
+        self._current_text_item = None
 
         self.pen = QPen()
         self.pen.setStyle(Qt.DashDotLine)
@@ -170,6 +174,12 @@ class PhotoViewer(QGraphicsView):
 
     def has_photo(self):
         return not self._empty
+
+
+    def add_all_line_measurements(self, line_data):
+        for line in line_data:
+            self._scene.addItem(line[0]) # line item
+            self._scene.addItem(line[1]) # text item
 
     def draw_scale_bar(self, painter):
         current_scale_factor = self.transform().m11()
@@ -204,8 +214,6 @@ class PhotoViewer(QGraphicsView):
 
         painter.drawText(text_x, text_y, text)
 
-
-
     def paintEvent(self, event):
         super().paintEvent(event)  # Draw the scene
         painter = QPainter(self.viewport())
@@ -236,9 +244,13 @@ class PhotoViewer(QGraphicsView):
             print(type(item))
             if isinstance(item, QGraphicsEllipseItem):
                 self._scene.removeItem(item)
-            elif isinstance(item, QGraphicsTextItem):
-                self._scene.removeItem(item)
             elif isinstance(item, QGraphicsPolygonItem):
+                self._scene.removeItem(item)
+
+    def clean_scene_line(self):
+        for item in self._scene.items():
+            print(type(item))
+            if isinstance(item, QGraphicsLineItem):
                 self._scene.removeItem(item)
 
     def clean_scene_poly(self):
@@ -297,13 +309,12 @@ class PhotoViewer(QGraphicsView):
             self.setDragMode(QGraphicsView.ScrollHandDrag)
             self._photo.setPixmap(pixmap)
 
-            self.point_size = pixmap.width()/100
-            self.text_size = pixmap.width()/100
+            self.point_size = pixmap.width() / 100
+            self.text_size = pixmap.width() / 100
         else:
             self._empty = True
             self.setDragMode(QGraphicsView.NoDrag)
             self._photo.setPixmap(QPixmap())
-
 
     def toggleDragMode(self):
         if self.rect or self.select_point:
@@ -313,7 +324,6 @@ class PhotoViewer(QGraphicsView):
                 self.setDragMode(QGraphicsView.NoDrag)
             elif not self._photo.pixmap().isNull():
                 self.setDragMode(QGraphicsView.ScrollHandDrag)
-
 
     def add_poly(self, coordinates):
         # Create a QPolygonF from the coordinates
@@ -344,31 +354,6 @@ class PhotoViewer(QGraphicsView):
             # Add the QGraphicsPolygonItem to the scene
             self._scene.addItem(polygon_item)
 
-    def add_list_infos(self, list_objects, only_name=False):
-        for el in list_objects:
-            x1, y1, x2, y2, score, class_id = el.yolo_bbox
-            text = el.name
-            text2 = str(round(el.area, 2)) + 'm² '
-            text3 = str(round(el.volume, 2)) + 'm³'
-
-            print(f'adding {text} to viewer')
-
-            # add text 1
-            text_item = QGraphicsTextItem()
-            text_item.setPos(x1, y1)
-            text_item.setHtml(
-                "<div style='background-color:rgba(255, 255, 255, 0.3);'>" + text + "</div>")
-
-            self._scene.addItem(text_item)
-
-            if not only_name:
-                # add text 2 and 3
-                text_item2 = QGraphicsTextItem()
-                text_item2.setPos(x1, y2)
-                text_item2.setHtml(
-                    "<div style='background-color:rgba(255, 255, 255, 0.3);'>" + text2 + "<br>" + text3 + " </div>")
-                self._scene.addItem(text_item2)
-
     def get_coord(self, QGraphicsRect):
         rect = QGraphicsRect.rect()
         coord = [rect.topLeft(), rect.bottomRight()]
@@ -380,7 +365,6 @@ class PhotoViewer(QGraphicsView):
         print(self._current_point)
         self.draw_ellipse(self._current_point)
         return self._current_point
-
 
     def draw_ellipse(self, point, type):
         # test color
@@ -453,10 +437,66 @@ class PhotoViewer(QGraphicsView):
             self.viewport().update()
 
     def mousePressEvent(self, event):
-        if self.measure_length:
-            pass
+        if self.line_meas:
+            self._current_line_item = QGraphicsLineItem()
+            self._current_line_item.setPen(self.pen_yolo)
+
+            self._current_text_item = QGraphicsTextItem()  # Format the distance to 2 decimal places
+            self._current_text_item.setZValue(1)
+            self._scene.addItem(self._current_text_item)
+
+            self._scene.addItem(self._current_line_item)
+            self.origin = self.mapToScene(event.pos())
+
+            self._current_line_item.setLine(QLineF(self.origin, self.origin))
 
         else:
             if self._photo.isUnderMouse():
                 self.photoClicked.emit(self.mapToScene(event.pos()).toPoint())
         super(PhotoViewer, self).mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if self.line_meas:
+            if self._current_line_item is not None:
+                self.new_coord = self.mapToScene(event.pos())
+                self._current_line_item.setLine(QLineF(self.origin, self.new_coord))
+
+                # compute line values
+                p1 = np.array([int(self.origin.x()), int(self.origin.y())])
+                p2 = np.array([int(self.new_coord.x()), int(self.new_coord.y())])
+
+                distance = np.linalg.norm(p2 - p1)
+
+                # Calculate midpoint
+                mid_x = (self.origin.x() + self.new_coord.x()) / 2
+                mid_y = (self.origin.y() + self.new_coord.y()) / 2
+                text_width = self._current_text_item.boundingRect().width()
+                text_height = self._current_text_item.boundingRect().height()
+
+                # update text
+                html_content = f"""
+                <div style='background-color: rgba(255, 255, 255, 0.5);'>
+                    {distance:.2f}
+                </div>
+                """
+                self._current_text_item.setHtml(html_content)
+                self._current_text_item.setPos(mid_x - text_width / 2, mid_y - text_height / 2)
+                self._current_text_item.setDefaultTextColor(QColor("blue"))
+
+
+        super(PhotoViewer, self).mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        if self.line_meas:
+            self.line_meas = False
+
+            if self._current_line_item is not None:
+                # emit signal (end of measure)
+                self.endDrawing_line_meas.emit(self._current_line_item, self._current_text_item)
+                print('Line meas. added')
+
+            self.origin = QPoint()
+            self._current_line_item = None
+            self._current_text_item = None
+
+        super(PhotoViewer, self).mouseReleaseEvent(event)

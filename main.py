@@ -126,19 +126,26 @@ class CrackApp(QMainWindow):
         self.active_img = self.list_image[0]
         self.image_loaded = False
         self.resolution = 0
+        # list of line measurements
+        self.line_meas_list = []
+
 
         # connections
         self.actionLoad_image.triggered.connect(self.get_image)
         self.actionSegment.triggered.connect(self.go_segment)
         self.actionSet_scale.triggered.connect(self.set_scale)
-        self.actionMeasure.triggered.connect(self.line_measure)
+        self.actionMeasure.triggered.connect(self.line_meas)
 
         # pushbuttons
         self.pushButton_show_image.clicked.connect(self.update_view)
         self.pushButton_show_skel.clicked.connect(self.update_view)
         self.pushButton_show_mask.clicked.connect(self.update_view)
+        self.pushButton_show_linemeas.clicked.connect(self.toggle_line_meas)
         self.pushButton_export.clicked.connect(self.export_view)
         self.pushButton_export_view.clicked.connect(self.export_current_view)
+
+        # drawing ends
+        self.viewer.endDrawing_line_meas.connect(self.get_line_meas)
 
         if is_dark_theme:
             suf = '_white_tint'
@@ -149,14 +156,15 @@ class CrackApp(QMainWindow):
         self.add_icon(res.find(f'img/camera{suf}.png'), self.actionLoad_image)
         self.add_icon(res.find(f'img/magic{suf}.png'), self.actionSegment)
         self.add_icon(res.find(f'img/hand{suf}.png'), self.actionHand_selector)
-        self.add_icon(res.find(f'img/width{suf}.png'), self.actionMeasure)
-        self.add_icon(res.find(f'img/ruler{suf}.png'), self.actionSet_scale)
+        self.add_icon(res.find(f'img/ruler{suf}.png'), self.actionMeasure)
+        self.add_icon(res.find(f'img/size{suf}.png'), self.actionSet_scale)
         # push buttons
         self.add_icon(res.find(f'img/photo{suf2}.png'), self.pushButton_show_image)
         self.add_icon(res.find(f'img/skel{suf2}.png'), self.pushButton_show_skel)
         self.add_icon(res.find(f'img/mask{suf2}.png'), self.pushButton_show_mask)
         self.add_icon(res.find(f'img/save_as{suf2}.png'), self.pushButton_export)
         self.add_icon(res.find(f'img/view{suf2}.png'), self.pushButton_export_view)
+        self.add_icon(res.find(f'img/width{suf2}.png'), self.pushButton_show_linemeas)
 
     def set_scale(self):
         dialog = ScaleDialog()
@@ -165,14 +173,38 @@ class CrackApp(QMainWindow):
             print(f'New resolution is {self.resolution} mm/pixel')
             self.viewer.mm_per_pixel = self.resolution
 
+    def toggle_line_meas(self):
+        if self.pushButton_show_linemeas.isChecked():
+            self.viewer.add_all_line_measurements(self.line_meas_list)
+        else:
+            self.viewer.clean_scene_line()
+            self.viewer.clean_scene_text()
+
     def add_icon(self, img_source, pushButton_object):
         """
         Function to add an icon to a pushButton
         """
         pushButton_object.setIcon(QIcon(img_source))
 
-    def line_measure(self):
-        pass
+    def line_meas(self):
+        if self.actionMeasure.isChecked():
+            # activate drawing tool
+            self.viewer.line_meas = True
+            self.viewer.toggleDragMode()
+
+    def get_line_meas(self, line_obj, text_obj):
+        self.line_meas_list.append([line_obj, text_obj])
+
+        self.pushButton_show_linemeas.setEnabled(True)
+        self.pushButton_show_linemeas.setChecked(True)
+        self.hand_pan()
+
+
+    def hand_pan(self):
+        # switch back to hand tool
+        self.actionHand_selector.setChecked(True)
+        self.viewer.line_meas = False
+        self.viewer.toggleDragMode()
 
     def export_current_view(self):
         # Create a QImage with the size of the viewport
