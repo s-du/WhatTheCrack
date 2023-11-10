@@ -447,6 +447,8 @@ class PhotoViewer(QGraphicsView):
         font.setBold(True)  # Make the text bold
         text_item.setFont(font)
 
+
+
     # mouse events
     def wheelEvent(self, event):
         print(self._zoom)
@@ -484,6 +486,8 @@ class PhotoViewer(QGraphicsView):
             self._current_point = self.mapToScene(event.pos())
             self.photoClicked.emit([int(self._current_point.x()), int(self._current_point.y())])
 
+        super(PhotoViewer, self).mousePressEvent(event)
+
 
 
     def mouseMoveEvent(self, event):
@@ -504,10 +508,14 @@ class PhotoViewer(QGraphicsView):
                 text_width = self._current_text_item.boundingRect().width()
                 text_height = self._current_text_item.boundingRect().height()
 
+                new_font_size = self.scene().width() / 20
+                print(new_font_size)
+
+
                 # update text
                 if self.mm_per_pixel is None:
                     html_content = f"""
-                    <div style='background-color: rgba(255, 255, 255, 0.5);'>
+                    <div style='font-size: {new_font_size}px; background-color: rgba(255, 255, 255, 0.5);'>
                         {distance:.2f} pixels
                     </div>
                     """
