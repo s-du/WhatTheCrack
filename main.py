@@ -137,6 +137,7 @@ class CrackApp(QMainWindow):
         self.actionSet_scale.triggered.connect(self.set_scale)
         self.actionMeasure.triggered.connect(self.line_meas)
         self.actionMeasure_path.triggered.connect(self.path_meas)
+        self.actionHand_selector.triggered.connect(self.hand_pan)
 
         # pushbuttons
         self.pushButton_show_image.clicked.connect(self.update_view)
@@ -192,7 +193,9 @@ class CrackApp(QMainWindow):
 
     def line_meas(self):
         if self.actionMeasure.isChecked():
+            self.viewer.setCursor(Qt.ArrowCursor)
             # activate drawing tool
+            self.point_selection = False
             self.viewer.line_meas = True
             self.viewer.toggleDragMode()
 
@@ -204,8 +207,12 @@ class CrackApp(QMainWindow):
         self.hand_pan()
 
     def path_meas(self):
-        self.viewer.point_selection = True
-        self.viewer.toggleDragMode()
+        if self.actionMeasure_path.isChecked():
+            self.viewer.point_selection = True
+            # change cursor
+            circle_cursor = self.viewer.create_circle_cursor(30)  # 30 pixels in diameter
+            self.viewer.setCursor(circle_cursor)
+            self.viewer.toggleDragMode()
 
     def get_path(self, list):
         x = list[1]
@@ -213,18 +220,19 @@ class CrackApp(QMainWindow):
 
         img = cv2.imread(self.output_skeleton)
 
-        path = seg.find_path(img[:,:,1], x, y, self.junctions, self.endpoints)
+        close_pixel = seg.find_closest_white_pixel(img[:,:,1], x, y, 30)
+        if close_pixel is not None:
+            path = seg.find_path(img[:,:,1], close_pixel[0], close_pixel[1], self.junctions, self.endpoints)
 
-        # highlighted_img = seg.highlight_path(img.shape, path)
-        self.viewer.add_path_to_scene(path)
-
-
-        self.hand_pan()
+            # highlighted_img = seg.highlight_path(img.shape, path)
+            self.viewer.add_path_to_scene(path)
 
     def hand_pan(self):
         # switch back to hand tool
-        self.actionHand_selector.setChecked(True)
+        self.viewer.point_selection = False
         self.viewer.line_meas = False
+
+        self.actionHand_selector.setChecked(True)
         self.viewer.toggleDragMode()
 
     def export_current_view(self):

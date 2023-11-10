@@ -4,6 +4,7 @@ from PySide6.QtCore import *
 from PySide6.QtGui import *
 from PySide6.QtWidgets import *
 from PySide6.QtUiTools import QUiLoader
+import resources as res
 
 
 class UiLoader(QUiLoader):
@@ -173,6 +174,13 @@ class PhotoViewer(QGraphicsView):
         self.pen_yolo.setCapStyle(Qt.RoundCap)
         self.pen_yolo.setJoinStyle(Qt.RoundJoin)
 
+        # custom cursor
+        # define custom cursor
+        cur_img = res.find('img/circle.png')
+        self.cur_pixmap = QPixmap(cur_img)
+        pixmap_scaled = self.cur_pixmap.scaledToWidth(30)
+        self.brush_cur = QCursor(pixmap_scaled)
+
     def has_photo(self):
         return not self._empty
 
@@ -284,6 +292,28 @@ class PhotoViewer(QGraphicsView):
             ellipse.setPen(QPen(QColor("blue")))
             self._scene.addItem(ellipse)
 
+    def change_to_brush_cursor(self):
+        self.setCursor(self.brush_cur)
+
+    def create_circle_cursor(self, diameter):
+        # Create a QPixmap with a transparent background
+        pixmap = QPixmap(diameter, diameter)
+        pixmap.fill(Qt.transparent)
+
+        # Create a QPainter to draw on the pixmap
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.Antialiasing)
+
+        # Draw a circle
+        painter.setPen(QColor(0, 0, 0))  # Black color, you can change as needed
+        painter.drawEllipse(0, 0, diameter - 1, diameter - 1)
+
+        # End painting
+        painter.end()
+
+        # Create a cursor from the pixmap
+        return QCursor(pixmap)
+
     def compose_mask_image(self, image_path):
         self.destinationImage.load(image_path)
         painter = QPainter(self.resultImage)
@@ -318,13 +348,12 @@ class PhotoViewer(QGraphicsView):
             self._photo.setPixmap(QPixmap())
 
     def toggleDragMode(self):
-        if self.rect or self.select_point:
+        print(self.line_meas, self.point_selection)
+        if self.line_meas or self.point_selection:
             self.setDragMode(QGraphicsView.NoDrag)
         else:
-            if self.dragMode() == QGraphicsView.ScrollHandDrag:
-                self.setDragMode(QGraphicsView.NoDrag)
-            elif not self._photo.pixmap().isNull():
-                self.setDragMode(QGraphicsView.ScrollHandDrag)
+            self.setDragMode(QGraphicsView.ScrollHandDrag)
+            print('Scroll Hand!')
 
     def add_poly(self, coordinates):
         # Create a QPolygonF from the coordinates
@@ -454,7 +483,7 @@ class PhotoViewer(QGraphicsView):
         elif self.point_selection:
             self._current_point = self.mapToScene(event.pos())
             self.photoClicked.emit([int(self._current_point.x()), int(self._current_point.y())])
-            self.point_selection = False
+
 
 
     def mouseMoveEvent(self, event):
