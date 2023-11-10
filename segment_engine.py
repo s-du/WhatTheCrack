@@ -1,10 +1,12 @@
 from sahi import AutoDetectionModel
 from sahi.predict import get_sliced_prediction
 from skimage.morphology import skeletonize
+from scipy.ndimage import convolve
 from PIL import Image
 import numpy as np
 import os
 import resources as res
+import cv2
 
 model_path = res.find('other/best.pt')
 
@@ -83,3 +85,20 @@ def create_binary_image(result, output_folder):
     image.save(output_skel_color)
 
     return crack_length, output_binary_mask, output_color_mask, output_skeleton, output_skel_color
+
+
+def find_junctions_endpoints(skel_path):
+    img = cv2.imread(skel_path, 0)
+    _, skel = cv2.threshold(img, 127, 255, cv2.THRESH_BINARY)
+    # Kernel for convolution
+    kernel = np.array([[1, 1, 1], [1, 10, 1], [1, 1, 1]], dtype=np.uint8)
+
+    # Apply convolution
+    filtered = convolve(skel // 255, kernel, mode='constant', cval=1)
+
+    # Junctions have a value greater than 12
+    # Endpoints have a value of exactly 11
+    junctions = np.argwhere(filtered > 12)
+    endpoints = np.argwhere(filtered == 11)
+
+    return junctions, endpoints

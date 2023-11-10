@@ -253,6 +253,23 @@ class PhotoViewer(QGraphicsView):
             if isinstance(item, QGraphicsTextItem):
                 self._scene.removeItem(item)
 
+    def add_nodes(self, junctions, endpoints):
+        # Calculate scale factor (adjust as needed)
+        scale_factor = 5
+
+        # Add markers for junctions
+        for y, x in junctions:
+            ellipse = QGraphicsEllipseItem(
+                QRectF(x - scale_factor // 2, y - scale_factor // 2, scale_factor, scale_factor))
+            ellipse.setPen(QPen(QColor("red")))
+            self._scene.addItem(ellipse)
+
+        # Add markers for endpoints
+        for y, x in endpoints:
+            ellipse = QGraphicsEllipseItem(
+                QRectF(x - scale_factor // 2, y - scale_factor // 2, scale_factor, scale_factor))
+            ellipse.setPen(QPen(QColor("blue")))
+            self._scene.addItem(ellipse)
 
     def compose_mask_image(self, image_path):
         self.destinationImage.load(image_path)

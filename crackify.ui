@@ -40,6 +40,9 @@
              <height>32</height>
             </size>
            </property>
+           <property name="toolTip">
+            <string>Show original image</string>
+           </property>
            <property name="text">
             <string/>
            </property>
@@ -64,6 +67,9 @@
              <width>32</width>
              <height>32</height>
             </size>
+           </property>
+           <property name="toolTip">
+            <string>Show YOLO segmentation masks</string>
            </property>
            <property name="text">
             <string/>
@@ -90,6 +96,9 @@
              <height>32</height>
             </size>
            </property>
+           <property name="toolTip">
+            <string>Show skeleton representation of cracks</string>
+           </property>
            <property name="text">
             <string/>
            </property>
@@ -114,6 +123,34 @@
              <width>32</width>
              <height>32</height>
             </size>
+           </property>
+           <property name="toolTip">
+            <string>Save entire image</string>
+           </property>
+           <property name="text">
+            <string/>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="pushButton_export_view">
+           <property name="enabled">
+            <bool>false</bool>
+           </property>
+           <property name="minimumSize">
+            <size>
+             <width>32</width>
+             <height>32</height>
+            </size>
+           </property>
+           <property name="maximumSize">
+            <size>
+             <width>32</width>
+             <height>32</height>
+            </size>
+           </property>
+           <property name="toolTip">
+            <string>Export current view as image</string>
            </property>
            <property name="text">
             <string/>

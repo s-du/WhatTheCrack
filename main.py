@@ -131,10 +131,14 @@ class CrackApp(QMainWindow):
         self.actionLoad_image.triggered.connect(self.get_image)
         self.actionSegment.triggered.connect(self.go_segment)
         self.actionSet_scale.triggered.connect(self.set_scale)
+        self.actionMeasure.triggered.connect(self.line_measure)
+
         # pushbuttons
         self.pushButton_show_image.clicked.connect(self.update_view)
         self.pushButton_show_skel.clicked.connect(self.update_view)
         self.pushButton_show_mask.clicked.connect(self.update_view)
+        self.pushButton_export.clicked.connect(self.export_view)
+        self.pushButton_export_view.clicked.connect(self.export_current_view)
 
         if is_dark_theme:
             suf = '_white_tint'
@@ -151,6 +155,8 @@ class CrackApp(QMainWindow):
         self.add_icon(res.find(f'img/photo{suf2}.png'), self.pushButton_show_image)
         self.add_icon(res.find(f'img/skel{suf2}.png'), self.pushButton_show_skel)
         self.add_icon(res.find(f'img/mask{suf2}.png'), self.pushButton_show_mask)
+        self.add_icon(res.find(f'img/save_as{suf2}.png'), self.pushButton_export)
+        self.add_icon(res.find(f'img/view{suf2}.png'), self.pushButton_export_view)
 
     def set_scale(self):
         dialog = ScaleDialog()
@@ -165,19 +171,77 @@ class CrackApp(QMainWindow):
         """
         pushButton_object.setIcon(QIcon(img_source))
 
+    def line_measure(self):
+        pass
+
+    def export_current_view(self):
+        # Create a QImage with the size of the viewport
+        image = QImage(self.viewer.viewport().size(), QImage.Format_ARGB32_Premultiplied)
+        image.fill(Qt.transparent)
+
+        # Paint the QGraphicsView's viewport onto the QImage
+        painter = QPainter(image)
+        self.viewer.render(painter)
+        painter.end()
+
+        # Open 'Save As' dialog
+        file_path, _ = QFileDialog.getSaveFileName(
+            None, "Save Image", "", "PNG Image (*.png);;JPEG Image (*.jpg *.jpeg)"
+        )
+
+        # Save the image if a file path was provided, using high-quality settings for JPEG
+        if file_path:
+            if file_path.lower().endswith('.jpg') or file_path.lower().endswith('.jpeg'):
+                image.save(file_path, 'JPEG', 100)
+            else:
+                image.save(file_path)  # PNG is lossless by default
+
+    def export_view(self):
+        # Get the scene from QGraphicsView
+        scene = self.viewer._scene
+
+        # Create a QImage with the size of the scene
+        image = QImage(scene.sceneRect().size().toSize(), QImage.Format_ARGB32_Premultiplied)
+        image.fill(Qt.transparent)
+
+        # Paint the scene onto the QImage
+        painter = QPainter(image)
+        painter.setRenderHints(QPainter.Antialiasing | QPainter.TextAntialiasing, False)
+        scene.render(painter)
+        painter.end()
+
+        # Open 'Save As' dialog
+        file_path, _ = QFileDialog.getSaveFileName(
+            None, "Save Image", "", "PNG Image (*.png);;JPEG Image (*.jpg *.jpeg)"
+        )
+
+        # Save the image if a file path was provided, using high-quality settings for JPEG
+        if file_path:
+            if file_path.lower().endswith('.jpg') or file_path.lower().endswith('.jpeg'):
+                image.save(file_path, 'JPEG', 100)
+            else:
+                image.save(file_path)  # PNG is lossless by default
+
     def update_view(self):
         if self.pushButton_show_image.isChecked():
             if self.pushButton_show_mask.isChecked():
                 self.viewer.compose_mask_image(self.output_color_mask)
+                self.viewer.clean_scene()
             elif self.pushButton_show_skel.isChecked():
                 self.viewer.compose_mask_image(self.output_skel_color)
+                # add markers to image
+                self.viewer.add_nodes(self.junctions, self.endpoints)
             else:
+                self.viewer.clean_scene()
                 self.viewer.setPhoto(QPixmap(self.image_path))
         else:
             if self.pushButton_show_mask.isChecked():
+                self.viewer.clean_scene()
                 self.viewer.setPhoto(QPixmap(self.output_color_mask))
             elif self.pushButton_show_skel.isChecked():
                 self.viewer.setPhoto(QPixmap(self.output_skel_color))
+                # add markers to image
+                self.viewer.add_nodes(self.junctions, self.endpoints)
             else:
                 # Load the existing image
                 original_image = QImage(self.image_path)  # Replace with your image path
@@ -188,6 +252,7 @@ class CrackApp(QMainWindow):
 
                 # Convert the white QImage to QPixmap
                 white_pixmap = QPixmap.fromImage(white_image)
+                self.viewer.clean_scene()
                 self.viewer.setPhoto(white_pixmap)
 
 
@@ -196,6 +261,9 @@ class CrackApp(QMainWindow):
         print(self.image_path)
         result = seg.get_segmentation_result(self.image_path)
         self.crack_length, self.output_binary_mask, self.output_color_mask, self.output_skeleton, self.output_skel_color = seg.create_binary_image(result, '')
+
+        # compute junctions from skeleton image
+        self.junctions, self.endpoints = seg.find_junctions_endpoints(self.output_skeleton)
 
         self.pushButton_show_mask.setEnabled(True)
         self.pushButton_show_skel.setEnabled(True)
@@ -240,6 +308,8 @@ class CrackApp(QMainWindow):
 
         self.pushButton_show_image.setEnabled(True)
         self.pushButton_show_image.setChecked(True)
+        self.pushButton_export.setEnabled(True)
+        self.pushButton_export_view.setEnabled(True)
 
 
 def main(argv=None):
