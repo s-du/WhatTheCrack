@@ -1,3 +1,5 @@
+from PySide6.QtGui import QImage, QColor, QPainter
+
 from sahi import AutoDetectionModel
 from sahi.predict import get_sliced_prediction
 from skimage.morphology import skeletonize
@@ -102,3 +104,62 @@ def find_junctions_endpoints(skel_path):
     endpoints = np.argwhere(filtered == 11)
 
     return junctions, endpoints
+
+def is_valid_pixel(x, y, img_shape):
+    return 0 <= x < img_shape[0] and 0 <= y < img_shape[1]
+
+def is_node(x, y, junctions, endpoints):
+    return (x, y) in junctions or (x, y) in endpoints
+
+def find_closest_white_pixel(img, x, y, radius):
+    min_dist = float('inf')
+    closest_pixel = None
+
+    for dx in range(-radius, radius + 1):
+        for dy in range(-radius, radius + 1):
+            nx, ny = x + dx, y + dy
+            if is_valid_pixel(nx, ny, img.shape) and img[nx, ny] == 255:
+                dist = np.sqrt(dx**2 + dy**2)
+                if dist < min_dist:
+                    min_dist = dist
+                    closest_pixel = (nx, ny)
+
+    return closest_pixel
+
+def find_path(img, x, y, junctions, endpoints, radius=100):
+    # Find the closest white pixel within the given radius
+    start_pixel = find_closest_white_pixel(img, x, y, radius)
+    if start_pixel is None:
+        return []
+
+    x, y = start_pixel
+    visited = set()
+    path = []
+
+    def dfs(x, y):
+        if not is_valid_pixel(x, y, img.shape) or img[x, y] == 0 or (x, y) in visited:
+            return
+        visited.add((x, y))
+        path.append((x, y))
+
+        if is_node(x, y, junctions, endpoints):
+            return
+
+        # 8-neighborhood
+        for dx in [-1, 0, 1]:
+            for dy in [-1, 0, 1]:
+                if dx != 0 or dy != 0:
+                    dfs(x + dx, y + dy)
+
+    dfs(x, y)
+    return path
+
+def highlight_path(img_shape, path):
+    # Create a black image of the same size as the original image
+    highlighted_img = np.zeros(img_shape, dtype=np.uint8)
+
+    # Set the pixels along the path to white
+    for x, y in path:
+        highlighted_img[x, y] = 255
+
+    return highlighted_img

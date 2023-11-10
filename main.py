@@ -4,7 +4,7 @@ from PySide6.QtWidgets import *
 import widgets as wid
 import resources as res
 import segment_engine as seg
-
+import cv2
 
 class CustomDoubleValidator(QDoubleValidator):
     def __init__(self, *args, **kwargs):
@@ -110,6 +110,7 @@ class CrackApp(QMainWindow):
         ag = QActionGroup(self)
         ag.setExclusive(True)
         ag.addAction(self.actionMeasure)
+        ag.addAction(self.actionMeasure_path)
         ag.addAction(self.actionHand_selector)
 
         # mutually exclusive pushbuttons
@@ -135,6 +136,7 @@ class CrackApp(QMainWindow):
         self.actionSegment.triggered.connect(self.go_segment)
         self.actionSet_scale.triggered.connect(self.set_scale)
         self.actionMeasure.triggered.connect(self.line_meas)
+        self.actionMeasure_path.triggered.connect(self.path_meas)
 
         # pushbuttons
         self.pushButton_show_image.clicked.connect(self.update_view)
@@ -146,6 +148,7 @@ class CrackApp(QMainWindow):
 
         # drawing ends
         self.viewer.endDrawing_line_meas.connect(self.get_line_meas)
+        self.viewer.photoClicked.connect(self.get_path)
 
         if is_dark_theme:
             suf = '_white_tint'
@@ -154,9 +157,10 @@ class CrackApp(QMainWindow):
             suf = ''
 
         self.add_icon(res.find(f'img/camera{suf}.png'), self.actionLoad_image)
-        self.add_icon(res.find(f'img/magic{suf}.png'), self.actionSegment)
+        self.add_icon(res.find(f'img/crack{suf}.png'), self.actionSegment)
         self.add_icon(res.find(f'img/hand{suf}.png'), self.actionHand_selector)
         self.add_icon(res.find(f'img/ruler{suf}.png'), self.actionMeasure)
+        self.add_icon(res.find(f'img/magic{suf}.png'), self.actionMeasure_path)
         self.add_icon(res.find(f'img/size{suf}.png'), self.actionSet_scale)
         # push buttons
         self.add_icon(res.find(f'img/photo{suf2}.png'), self.pushButton_show_image)
@@ -199,6 +203,23 @@ class CrackApp(QMainWindow):
         self.pushButton_show_linemeas.setChecked(True)
         self.hand_pan()
 
+    def path_meas(self):
+        self.viewer.point_selection = True
+        self.viewer.toggleDragMode()
+
+    def get_path(self, list):
+        x = list[1]
+        y = list[0]
+
+        img = cv2.imread(self.output_skeleton)
+
+        path = seg.find_path(img[:,:,1], x, y, self.junctions, self.endpoints)
+
+        # highlighted_img = seg.highlight_path(img.shape, path)
+        self.viewer.add_path_to_scene(path)
+
+
+        self.hand_pan()
 
     def hand_pan(self):
         # switch back to hand tool
@@ -218,7 +239,7 @@ class CrackApp(QMainWindow):
 
         # Open 'Save As' dialog
         file_path, _ = QFileDialog.getSaveFileName(
-            None, "Save Image", "", "PNG Image (*.png);;JPEG Image (*.jpg *.jpeg)"
+            None, "Save Image", "", "PNG Image (*.png);;JPEG Image (*.jpg *.jpeg *.JPEG)"
         )
 
         # Save the image if a file path was provided, using high-quality settings for JPEG
@@ -301,6 +322,8 @@ class CrackApp(QMainWindow):
         self.pushButton_show_skel.setEnabled(True)
         self.pushButton_show_mask.setChecked(True)
 
+        self.actionMeasure_path.setEnabled(True)
+
         self.update_view()
 
     def get_image(self):
@@ -310,7 +333,7 @@ class CrackApp(QMainWindow):
         """
         try:
             img = QFileDialog.getOpenFileName(self, u"Ouverture de fichiers", "",
-                                                        "Image Files (*.png *.jpg *.bmp *.tif)")
+                                                        "Image Files (*.png *.jpg *.JPEG *.bmp *.tif)")
             print(f'the following image will be loaded {img[0]}')
         except:
             pass

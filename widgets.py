@@ -118,7 +118,7 @@ def loadUi(uifile, baseinstance=None, customWidgets=None,
 
 
 class PhotoViewer(QGraphicsView):
-    photoClicked = Signal(QPoint)
+    photoClicked = Signal(list)
     endDrawing_rect = Signal()
     endDrawing_line_meas = Signal(QGraphicsLineItem, QGraphicsTextItem)
 
@@ -149,8 +149,9 @@ class PhotoViewer(QGraphicsView):
         self.setMouseTracking(True)
         self.origin = QPoint()
 
-        # tool activation
+        # tools activation
         self.line_meas = False
+        self.point_selection = False
 
         # current items
         self._current_point = None
@@ -450,10 +451,11 @@ class PhotoViewer(QGraphicsView):
 
             self._current_line_item.setLine(QLineF(self.origin, self.origin))
 
-        else:
-            if self._photo.isUnderMouse():
-                self.photoClicked.emit(self.mapToScene(event.pos()).toPoint())
-        super(PhotoViewer, self).mousePressEvent(event)
+        elif self.point_selection:
+            self._current_point = self.mapToScene(event.pos())
+            self.photoClicked.emit([int(self._current_point.x()), int(self._current_point.y())])
+            self.point_selection = False
+
 
     def mouseMoveEvent(self, event):
         if self.line_meas:
@@ -474,11 +476,18 @@ class PhotoViewer(QGraphicsView):
                 text_height = self._current_text_item.boundingRect().height()
 
                 # update text
-                html_content = f"""
-                <div style='background-color: rgba(255, 255, 255, 0.5);'>
-                    {distance:.2f}
-                </div>
-                """
+                if self.mm_per_pixel is None:
+                    html_content = f"""
+                    <div style='background-color: rgba(255, 255, 255, 0.5);'>
+                        {distance:.2f} pixels
+                    </div>
+                    """
+                else:
+                    html_content = f"""
+                                        <div style='background-color: rgba(255, 255, 255, 0.5);'>
+                                            {distance:.2f} pixels <br> {distance*self.mm_per_pixel:.2f} mm
+                                        </div>
+                                        """
                 self._current_text_item.setHtml(html_content)
                 self._current_text_item.setPos(mid_x - text_width / 2, mid_y - text_height / 2)
                 self._current_text_item.setDefaultTextColor(QColor("blue"))
@@ -500,3 +509,16 @@ class PhotoViewer(QGraphicsView):
             self._current_text_item = None
 
         super(PhotoViewer, self).mouseReleaseEvent(event)
+
+    def add_path_to_scene(self, path):
+        if len(path) < 2:
+            return  # Need at least two points to draw a path
+
+        painter_path = QPainterPath()
+        painter_path.moveTo(QPointF(path[0][1], path[0][0]))  # Start at the first point
+
+        for x, y in path[1:]:
+            painter_path.lineTo(QPointF(y, x))  # Add line to each point
+
+        path_item = QGraphicsPathItem(painter_path)
+        self._scene.addItem(path_item)
