@@ -108,8 +108,8 @@ def find_junctions_endpoints(skel_path):
 def is_valid_pixel(x, y, img_shape):
     return 0 <= x < img_shape[0] and 0 <= y < img_shape[1]
 
-def is_node(x, y, junctions, endpoints):
-    return (x, y) in junctions or (x, y) in endpoints
+def is_node(x, y, nodes_array):
+    return any((nodes_array == [x, y]).all(1))
 
 def find_closest_white_pixel(img, x, y, radius):
     min_dist = float('inf')
@@ -126,33 +126,68 @@ def find_closest_white_pixel(img, x, y, radius):
 
     return closest_pixel
 
-def find_path(img, x, y, junctions, endpoints, radius=100):
-    # Find the closest white pixel within the given radius
-    start_pixel = find_closest_white_pixel(img, x, y, radius)
-    if start_pixel is None:
+def find_path(img, x, y, junctions, endpoints):
+    print(junctions)
+    print(endpoints)
+    if img[x, y] == 0:  # Check if the starting pixel is part of the skeleton
         return []
 
-    x, y = start_pixel
-    visited = set()
-    path = []
+    def dfs(start_x, start_y, visited):
+        print(start_x, start_y)
+        if not (0 <= start_x < img.shape[0] and 0 <= start_y < img.shape[1]):
+            return []
+        if img[start_x, start_y] == 0:
+            print('Zero!')
+            return []
+        if (start_x, start_y) in visited:
+            print('Visited!')
+            return []
+        if is_node(start_x, start_y, junctions):
+            print('reach junction!___________________________')
+            return [(start_x, start_y)]
+        if is_node(start_x, start_y, endpoints):
+            print('reach end point!___________________________')
+            return [(start_x, start_y)]
 
-    def dfs(x, y):
-        if not is_valid_pixel(x, y, img.shape) or img[x, y] == 0 or (x, y) in visited:
-            return
-        visited.add((x, y))
-        path.append((x, y))
-
-        if is_node(x, y, junctions, endpoints):
-            return
+        visited.add((start_x, start_y))
+        path = [(start_x, start_y)]
 
         # 8-neighborhood
         for dx in [-1, 0, 1]:
             for dy in [-1, 0, 1]:
                 if dx != 0 or dy != 0:
-                    dfs(x + dx, y + dy)
+                    nx, ny = start_x + dx, start_y + dy
+                    if (nx, ny) not in visited:
+                        next_path = dfs(nx, ny, visited)
+                        if next_path:
+                            return path + next_path
+        return path
 
-    dfs(x, y)
-    return path
+
+
+    # Find the immediate neighbors that are part of the skeleton
+    neighbors = []
+    for dx in [-1, 0, 1]:
+        for dy in [-1, 0, 1]:
+            if dx != 0 or dy != 0:
+                nx, ny = x + dx, y + dy
+                if 0 <= nx < img.shape[0] and 0 <= ny < img.shape[1] and img[nx, ny] != 0:
+                    neighbors.append((nx, ny))
+
+    # If less than two neighbors, cannot determine two directions
+    if len(neighbors) < 2:
+        return []
+
+    # Perform DFS in two different directions
+    path1 = dfs(neighbors[0][0], neighbors[0][1], set([(x, y)]))
+    print(path1)
+    path2 = dfs(neighbors[1][0], neighbors[1][1], set([(x, y)]))
+    print(path2)
+
+    # Combine the paths with the starting point in the middle
+    combined_path = path1[::-1] + [(x, y)] + path2
+
+    return combined_path
 
 def highlight_path(img_shape, path):
     # Create a black image of the same size as the original image
