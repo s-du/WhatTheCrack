@@ -6,6 +6,7 @@ import resources as res
 import segment_engine as seg
 import cv2
 
+
 class CustomDoubleValidator(QDoubleValidator):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -18,6 +19,7 @@ class CustomDoubleValidator(QDoubleValidator):
     def fixup(self, string):
         # Replace comma with period in the final string
         return string.replace(',', '.')
+
 
 class ExclusiveButtonGroup:
     def __init__(self):
@@ -32,6 +34,7 @@ class ExclusiveButtonGroup:
         for button in self.buttons:
             if button != clicked_button:
                 button.setChecked(False)
+
 
 class ScaleDialog(QDialog):
     def __init__(self):
@@ -95,6 +98,7 @@ class ScaleDialog(QDialog):
             self.ok_button.setEnabled(False)
             self.result_label.setText("Resolution will be shown here")
 
+
 class CrackApp(QMainWindow):
     def __init__(self, is_dark_theme):
         super().__init__()
@@ -129,7 +133,6 @@ class CrackApp(QMainWindow):
         self.resolution = 0
         # list of line measurements
         self.line_meas_list = []
-
 
         # connections
         self.actionLoad_image.triggered.connect(self.get_image)
@@ -171,6 +174,12 @@ class CrackApp(QMainWindow):
         self.add_icon(res.find(f'img/view{suf2}.png'), self.pushButton_export_view)
         self.add_icon(res.find(f'img/width{suf2}.png'), self.pushButton_show_linemeas)
 
+    def add_icon(self, img_source, pushButton_object):
+        """
+        Function to add an icon to a pushButton
+        """
+        pushButton_object.setIcon(QIcon(img_source))
+
     def set_scale(self):
         dialog = ScaleDialog()
         if dialog.exec_():
@@ -178,18 +187,13 @@ class CrackApp(QMainWindow):
             print(f'New resolution is {self.resolution} mm/pixel')
             self.viewer.mm_per_pixel = self.resolution
 
+    # line measurement __________________________________________
     def toggle_line_meas(self):
         if self.pushButton_show_linemeas.isChecked():
             self.viewer.add_all_line_measurements(self.line_meas_list)
         else:
             self.viewer.clean_scene_line()
             self.viewer.clean_scene_text()
-
-    def add_icon(self, img_source, pushButton_object):
-        """
-        Function to add an icon to a pushButton
-        """
-        pushButton_object.setIcon(QIcon(img_source))
 
     def line_meas(self):
         if self.actionMeasure.isChecked():
@@ -206,6 +210,7 @@ class CrackApp(QMainWindow):
         self.pushButton_show_linemeas.setChecked(True)
         self.hand_pan()
 
+    # path measurement __________________________________________
     def path_meas(self):
         if self.actionMeasure_path.isChecked():
             self.viewer.point_selection = True
@@ -220,9 +225,9 @@ class CrackApp(QMainWindow):
 
         img = cv2.imread(self.output_skeleton)
 
-        close_pixel = seg.find_closest_white_pixel(img[:,:,1], x, y, 30)
+        close_pixel = seg.find_closest_white_pixel(img[:, :, 1], x, y, 30)
         if close_pixel is not None:
-            path = seg.find_path(img[:,:,1], close_pixel[0], close_pixel[1], self.junctions, self.endpoints)
+            path = seg.find_path(img[:, :, 1], close_pixel[0], close_pixel[1], self.junctions, self.endpoints)
 
             # highlighted_img = seg.highlight_path(img.shape, path)
             self.viewer.add_path_to_scene(path)
@@ -235,6 +240,100 @@ class CrackApp(QMainWindow):
         self.actionHand_selector.setChecked(True)
         self.viewer.toggleDragMode()
 
+    def update_view(self):
+        if self.pushButton_show_image.isChecked():
+            if self.pushButton_show_mask.isChecked():
+                self.viewer.compose_mask_image(self.output_color_mask)
+                self.viewer.clean_scene()
+            elif self.pushButton_show_skel.isChecked():
+                self.viewer.compose_mask_image(self.output_skel_color)
+                # add markers to image
+                self.viewer.add_nodes(self.junctions, self.endpoints)
+            else:
+                self.viewer.clean_scene()
+                self.viewer.setPhoto(QPixmap(self.image_path), fit_view=True)
+        else:
+            if self.pushButton_show_mask.isChecked():
+                self.viewer.clean_scene()
+                self.viewer.setPhoto(QPixmap(self.output_color_mask))
+            elif self.pushButton_show_skel.isChecked():
+                self.viewer.setPhoto(QPixmap(self.output_skel_color))
+                # add markers to image
+                self.viewer.add_nodes(self.junctions, self.endpoints)
+            else:
+                # Load the existing image
+                original_image = QImage(self.image_path)  # Replace with your image path
+
+                # Create a new white image of the same size
+                white_image = QImage(original_image.size(), QImage.Format_ARGB32)
+                white_image.fill(Qt.white)  # Fill the image with white color
+
+                # Convert the white QImage to QPixmap
+                white_pixmap = QPixmap.fromImage(white_image)
+                self.viewer.clean_scene()
+                self.viewer.setPhoto(white_pixmap, fit_view=True)
+
+    def go_segment(self):
+        # execute YOLO script
+        print(self.image_path)
+        result = seg.get_segmentation_result(self.image_path)
+        self.crack_length, self.output_binary_mask, self.output_color_mask, self.output_skeleton, self.output_skel_color = seg.create_binary_image(
+            result, '')
+
+        # compute junctions from skeleton image
+        self.junctions, self.endpoints = seg.find_junctions_endpoints(self.output_skeleton)
+
+        self.pushButton_show_mask.setEnabled(True)
+        self.pushButton_show_skel.setEnabled(True)
+        self.pushButton_show_mask.setChecked(True)
+
+        self.actionMeasure_path.setEnabled(True)
+
+        self.update_view()
+
+    # load data __________________________________________
+
+    def get_image(self):
+        """
+        Get the image path from the user
+        :return:
+        """
+        try:
+            img = QFileDialog.getOpenFileName(self, u"Ouverture de fichiers", "",
+                                              "Image Files (*.png *.jpg *.JPEG *.bmp *.tif)")
+            print(f'the following image will be loaded {img[0]}')
+        except:
+            pass
+        if img[0] != '':
+            # load and show new image
+            self.load_image(img[0])
+
+    def load_image(self, path):
+        """
+        Load the new image and reset the model
+        :param path:
+        :return:
+        """
+        # self.reset_points()
+
+        self.image_path = path
+        self.viewer.setPhoto(QPixmap(path), fit_view=True)
+        self.viewer.set_base_image(path)
+        self.image_loaded = True
+
+        # enable action
+        self.actionSegment.setEnabled(True)
+        self.actionMeasure.setEnabled(True)
+        self.actionSet_scale.setEnabled(True)
+        self.actionHand_selector.setEnabled(True)
+        self.actionHand_selector.setChecked(True)
+
+        self.pushButton_show_image.setEnabled(True)
+        self.pushButton_show_image.setChecked(True)
+        self.pushButton_export.setEnabled(True)
+        self.pushButton_export_view.setEnabled(True)
+
+    # export data __________________________________________
     def export_current_view(self):
         # Create a QImage with the size of the viewport
         image = QImage(self.viewer.viewport().size(), QImage.Format_ARGB32_Premultiplied)
@@ -282,97 +381,6 @@ class CrackApp(QMainWindow):
                 image.save(file_path, 'JPEG', 100)
             else:
                 image.save(file_path)  # PNG is lossless by default
-
-    def update_view(self):
-        if self.pushButton_show_image.isChecked():
-            if self.pushButton_show_mask.isChecked():
-                self.viewer.compose_mask_image(self.output_color_mask)
-                self.viewer.clean_scene()
-            elif self.pushButton_show_skel.isChecked():
-                self.viewer.compose_mask_image(self.output_skel_color)
-                # add markers to image
-                self.viewer.add_nodes(self.junctions, self.endpoints)
-            else:
-                self.viewer.clean_scene()
-                self.viewer.setPhoto(QPixmap(self.image_path))
-        else:
-            if self.pushButton_show_mask.isChecked():
-                self.viewer.clean_scene()
-                self.viewer.setPhoto(QPixmap(self.output_color_mask))
-            elif self.pushButton_show_skel.isChecked():
-                self.viewer.setPhoto(QPixmap(self.output_skel_color))
-                # add markers to image
-                self.viewer.add_nodes(self.junctions, self.endpoints)
-            else:
-                # Load the existing image
-                original_image = QImage(self.image_path)  # Replace with your image path
-
-                # Create a new white image of the same size
-                white_image = QImage(original_image.size(), QImage.Format_ARGB32)
-                white_image.fill(Qt.white)  # Fill the image with white color
-
-                # Convert the white QImage to QPixmap
-                white_pixmap = QPixmap.fromImage(white_image)
-                self.viewer.clean_scene()
-                self.viewer.setPhoto(white_pixmap)
-
-
-    def go_segment(self):
-        # execute YOLO script
-        print(self.image_path)
-        result = seg.get_segmentation_result(self.image_path)
-        self.crack_length, self.output_binary_mask, self.output_color_mask, self.output_skeleton, self.output_skel_color = seg.create_binary_image(result, '')
-
-        # compute junctions from skeleton image
-        self.junctions, self.endpoints = seg.find_junctions_endpoints(self.output_skeleton)
-
-        self.pushButton_show_mask.setEnabled(True)
-        self.pushButton_show_skel.setEnabled(True)
-        self.pushButton_show_mask.setChecked(True)
-
-        self.actionMeasure_path.setEnabled(True)
-
-        self.update_view()
-
-    def get_image(self):
-        """
-        Get the image path from the user
-        :return:
-        """
-        try:
-            img = QFileDialog.getOpenFileName(self, u"Ouverture de fichiers", "",
-                                                        "Image Files (*.png *.jpg *.JPEG *.bmp *.tif)")
-            print(f'the following image will be loaded {img[0]}')
-        except:
-            pass
-        if img[0] != '':
-            # load and show new image
-            self.load_image(img[0])
-
-    def load_image(self, path):
-        """
-        Load the new image and reset the model
-        :param path:
-        :return:
-        """
-        # self.reset_points()
-
-        self.image_path = path
-        self.viewer.setPhoto(QPixmap(path))
-        self.viewer.set_base_image(path)
-        self.image_loaded = True
-
-        # enable action
-        self.actionSegment.setEnabled(True)
-        self.actionMeasure.setEnabled(True)
-        self.actionSet_scale.setEnabled(True)
-        self.actionHand_selector.setEnabled(True)
-        self.actionHand_selector.setChecked(True)
-
-        self.pushButton_show_image.setEnabled(True)
-        self.pushButton_show_image.setChecked(True)
-        self.pushButton_export.setEnabled(True)
-        self.pushButton_export_view.setEnabled(True)
 
 
 def main(argv=None):

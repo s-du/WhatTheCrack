@@ -174,21 +174,23 @@ class PhotoViewer(QGraphicsView):
         self.pen_yolo.setCapStyle(Qt.RoundCap)
         self.pen_yolo.setJoinStyle(Qt.RoundJoin)
 
+        # initial text size
+        self.text_font_size = 0
+
         # custom cursor
-        # define custom cursor
+        # define custom cursor (if needed)
         cur_img = res.find('img/circle.png')
         self.cur_pixmap = QPixmap(cur_img)
-        pixmap_scaled = self.cur_pixmap.scaledToWidth(30)
+        pixmap_scaled = self.cur_pixmap.scaledToWidth(12)
         self.brush_cur = QCursor(pixmap_scaled)
 
     def has_photo(self):
         return not self._empty
 
-
     def add_all_line_measurements(self, line_data):
         for line in line_data:
-            self._scene.addItem(line[0]) # line item
-            self._scene.addItem(line[1]) # text item
+            self._scene.addItem(line[0])  # line item
+            self._scene.addItem(line[1])  # text item
 
     def draw_scale_bar(self, painter):
         current_scale_factor = self.transform().m11()
@@ -334,14 +336,19 @@ class PhotoViewer(QGraphicsView):
         self.resultSize = self.sourceImage.size()
         self.resultImage = QImage(self.resultSize, QImage.Format_ARGB32_Premultiplied)
 
-    def setPhoto(self, pixmap=None):
+    def setPhoto(self, pixmap=None, fit_view=False):
         if pixmap and not pixmap.isNull():
             self._empty = False
             self.setDragMode(QGraphicsView.ScrollHandDrag)
             self._photo.setPixmap(pixmap)
 
-            self.point_size = pixmap.width() / 100
-            self.text_size = pixmap.width() / 100
+            # initial text size
+            self.original_text_font_size = int(self.scene().width() / 75)
+            self.text_font_size = int(self.scene().width() / 75)
+
+            if fit_view:
+                self.fitInView()
+
         else:
             self._empty = True
             self.setDragMode(QGraphicsView.NoDrag)
@@ -447,7 +454,28 @@ class PhotoViewer(QGraphicsView):
         font.setBold(True)  # Make the text bold
         text_item.setFont(font)
 
+    def update_all_text_size(self):
+        print(f'update font size: {self.text_font_size}')
+        for item in self._scene.items():
+            if isinstance(item, QGraphicsTextItem):
+                font = QFont()
+                font.setPointSize(self.text_font_size)
+                font.setBold(True)  # Make the text bold
+                item.setFont(font)
 
+                text_width = item.boundingRect().width()
+                text_height = item.boundingRect().height()
+                # item.setPos(mid_x - text_width / 2, mid_y - text_height / 2)
+
+    def update_font_size(self):
+        # Adjust font size based on the zoom level
+        if self._zoom >= 0:
+            scale_factor = 1 / (1 + 0.25 * self._zoom)  # Adjust scaling factor as needed
+        else:
+            scale_factor = 1 + abs(self._zoom) * 0.2  # Adjust scaling factor for zoom out
+
+        self.text_font_size = int(self.original_text_font_size * scale_factor)
+        self.update_all_text_size()  # Function to update the text size in your view
 
     # mouse events
     def wheelEvent(self, event):
@@ -461,12 +489,17 @@ class PhotoViewer(QGraphicsView):
                 self._zoom -= 1
             if self._zoom > 0:
                 self.scale(factor, factor)
+                self.update_all_text_size()
+
             elif self._zoom == 0:
                 self.fitInView()
+
             else:
                 self._zoom = 0
 
             self.viewport().update()
+            self.update_font_size()
+
 
     def mousePressEvent(self, event):
         if self.line_meas:
@@ -488,8 +521,6 @@ class PhotoViewer(QGraphicsView):
 
         super(PhotoViewer, self).mousePressEvent(event)
 
-
-
     def mouseMoveEvent(self, event):
         if self.line_meas:
             if self._current_line_item is not None:
@@ -505,30 +536,23 @@ class PhotoViewer(QGraphicsView):
                 # Calculate midpoint
                 mid_x = (self.origin.x() + self.new_coord.x()) / 2
                 mid_y = (self.origin.y() + self.new_coord.y()) / 2
-                text_width = self._current_text_item.boundingRect().width()
-                text_height = self._current_text_item.boundingRect().height()
-
-                new_font_size = self.scene().width() / 20
-                print(new_font_size)
-
 
                 # update text
                 if self.mm_per_pixel is None:
-                    html_content = f"""
-                    <div style='font-size: {new_font_size}px; background-color: rgba(255, 255, 255, 0.5);'>
-                        {distance:.2f} pixels
-                    </div>
-                    """
-                else:
-                    html_content = f"""
-                                        <div style='background-color: rgba(255, 255, 255, 0.5);'>
-                                            {distance:.2f} pixels <br> {distance*self.mm_per_pixel:.2f} mm
-                                        </div>
-                                        """
-                self._current_text_item.setHtml(html_content)
-                self._current_text_item.setPos(mid_x - text_width / 2, mid_y - text_height / 2)
-                self._current_text_item.setDefaultTextColor(QColor("blue"))
+                    self._current_text_item.setPlainText(f'{distance:.2f} pixels')
 
+                else:
+                    self._current_text_item.setPlainText(
+                        f'{distance:.2f} pixels \n {distance * self.mm_per_pixel:.2f} mm')
+
+                text_width = self._current_text_item.boundingRect().width()
+                text_height = self._current_text_item.boundingRect().height()
+                self._current_text_item.setPos(mid_x - text_width / 2, mid_y - text_height / 2) #TODO Improve
+                self._current_text_item.setDefaultTextColor(QColor("blue"))
+                font = QFont()
+                font.setPointSize(self.text_font_size)
+                font.setBold(True)  # Make the text bold
+                self._current_text_item.setFont(font)
 
         super(PhotoViewer, self).mouseMoveEvent(event)
 
