@@ -118,6 +118,53 @@ def loadUi(uifile, baseinstance=None, customWidgets=None,
     return widget
 
 
+class ImageDialog(QDialog):
+    def __init__(self, image, parent=None):
+        super().__init__(parent)
+
+        self.setWindowTitle("Image Viewer")
+        self.setLayout(QVBoxLayout())
+
+        label = QLabel()
+        pixmap = QPixmap.fromImage(image)
+        label.setPixmap(pixmap)
+
+        self.layout().addWidget(label)
+
+
+class MagnifyingGlass(QGraphicsEllipseItem):
+    def __init__(self, size=200, parent=None):
+        self._size = size
+        super().__init__(-self._size/2, -self._size/2, self._size, self._size, parent)
+        self.setBrush(Qt.transparent)
+        self.pen = QPen()
+        self.pen.setStyle(Qt.DashDotLine)
+        self.pen.setWidth(4)
+        self.pen.setColor(QColor(255, 0, 0, a=255))
+
+        self.setPen(Qt.NoPen)
+        self.pixmap_item = QGraphicsPixmapItem(self)
+        self.pixmap_item.setPos(-self._size/2, -self._size/2)
+        self.setZValue(1)
+
+    def set_pixmap(self, pixmap):
+        # Create an elliptical mask for the pixmap
+        mask_image = QImage(pixmap.size(), QImage.Format_Alpha8)
+        mask_image.fill(Qt.transparent)
+
+        painter = QPainter(mask_image)
+        painter.setBrush(Qt.white)
+        painter.drawEllipse(mask_image.rect())
+        painter.end()
+
+        # Convert QImage to QBitmap for PySide6
+        mask_bitmap = QBitmap.fromImage(mask_image)
+
+        pixmap.setMask(mask_bitmap)
+
+        # Set the masked pixmap to the pixmap item
+        self.pixmap_item.setPixmap(pixmap)
+
 class PhotoViewer(QGraphicsView):
     photoClicked = Signal(list)
     endDrawing_rect = Signal()
@@ -184,6 +231,15 @@ class PhotoViewer(QGraphicsView):
         pixmap_scaled = self.cur_pixmap.scaledToWidth(12)
         self.brush_cur = QCursor(pixmap_scaled)
 
+        # magnifying glass
+        self.magnify = False
+
+        self.magnifying_glass_size = 400  # Adjust this value to change the size
+        self.magnifying_glass = MagnifyingGlass(self.magnifying_glass_size)
+        self._scene.addItem(self.magnifying_glass)
+        # Temporarily hide the magnifying glass to avoid rendering it
+        self.magnifying_glass.hide()
+
     def has_photo(self):
         return not self._empty
 
@@ -229,7 +285,6 @@ class PhotoViewer(QGraphicsView):
         super().paintEvent(event)  # Draw the scene
         painter = QPainter(self.viewport())
         if self.mm_per_pixel != None:
-            print('up')
             self.draw_scale_bar(painter)
 
     def fitInView(self, scale=True):
@@ -341,6 +396,7 @@ class PhotoViewer(QGraphicsView):
             self._empty = False
             self.setDragMode(QGraphicsView.ScrollHandDrag)
             self._photo.setPixmap(pixmap)
+            self.scene_image = pixmap.toImage()
 
             # initial text size
             self.original_text_font_size = int(self.scene().width() / 75)
@@ -356,7 +412,7 @@ class PhotoViewer(QGraphicsView):
 
     def toggleDragMode(self):
         print(self.line_meas, self.point_selection)
-        if self.line_meas or self.point_selection:
+        if self.line_meas or self.point_selection or self.magnify:
             self.setDragMode(QGraphicsView.NoDrag)
         else:
             self.setDragMode(QGraphicsView.ScrollHandDrag)
@@ -519,6 +575,10 @@ class PhotoViewer(QGraphicsView):
             self._current_point = self.mapToScene(event.pos())
             self.photoClicked.emit([int(self._current_point.x()), int(self._current_point.y())])
 
+        else:
+            if event.button() == Qt.RightButton:
+                self.mouse_pressed = True
+
         super(PhotoViewer, self).mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
@@ -554,6 +614,36 @@ class PhotoViewer(QGraphicsView):
                 font.setBold(True)  # Make the text bold
                 self._current_text_item.setFont(font)
 
+        else:
+            if self.mouse_pressed:
+                self._scene.setSceneRect(self._photo.pixmap().rect())
+                scene_pos = self.mapToScene(event.pos())
+
+                # Adjust these values for desired magnification
+                magnify_factor = 4
+
+                # Calculate the dimensions of the sub-pixmap to grab
+                grab_width = self.magnifying_glass_size // magnify_factor
+                grab_height = self.magnifying_glass_size // magnify_factor
+
+                # Calculate the top-left corner of the sub-pixmap to grab, such that the cursor is centered
+                grab_x = scene_pos.x() - grab_width / 2
+                grab_y = scene_pos.y() - grab_height / 2
+
+                # Extract the portion of the rendered scene around the cursor
+                sub_image = self.scene_image.copy(grab_x, grab_y, grab_width, grab_height)
+
+                # Convert QImage to QPixmap and scale it to achieve magnification
+                magnified_pixmap = QPixmap.fromImage(sub_image).scaled(self.magnifying_glass_size,
+                                                                       self.magnifying_glass_size,
+                                                                       Qt.KeepAspectRatio, Qt.SmoothTransformation)
+
+                # Update the magnifying glass
+                self.magnifying_glass.setPos(scene_pos)
+                self.magnifying_glass.set_pixmap(magnified_pixmap)
+                self.magnifying_glass.show()
+
+
         super(PhotoViewer, self).mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
@@ -568,6 +658,11 @@ class PhotoViewer(QGraphicsView):
             self.origin = QPoint()
             self._current_line_item = None
             self._current_text_item = None
+
+        if event.button() == Qt.RightButton:
+            self.mouse_pressed = False
+            self.magnifying_glass.hide()
+
 
         super(PhotoViewer, self).mouseReleaseEvent(event)
 

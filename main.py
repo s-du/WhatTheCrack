@@ -187,6 +187,7 @@ class CrackApp(QMainWindow):
             print(f'New resolution is {self.resolution} mm/pixel')
             self.viewer.mm_per_pixel = self.resolution
 
+
     # line measurement __________________________________________
     def toggle_line_meas(self):
         if self.pushButton_show_linemeas.isChecked():
@@ -200,6 +201,7 @@ class CrackApp(QMainWindow):
             self.viewer.setCursor(Qt.ArrowCursor)
             # activate drawing tool
             self.point_selection = False
+
             self.viewer.line_meas = True
             self.viewer.toggleDragMode()
 
@@ -214,6 +216,7 @@ class CrackApp(QMainWindow):
     def path_meas(self):
         if self.actionMeasure_path.isChecked():
             self.viewer.point_selection = True
+
             # change cursor
             circle_cursor = self.viewer.create_circle_cursor(30)  # 30 pixels in diameter
             self.viewer.setCursor(circle_cursor)
@@ -275,7 +278,8 @@ class CrackApp(QMainWindow):
 
     def go_segment(self):
         # execute YOLO script
-        print(self.image_path)
+        self.hand_pan()
+
         result = seg.get_segmentation_result(self.image_path)
         self.crack_length, self.output_binary_mask, self.output_color_mask, self.output_skeleton, self.output_skel_color = seg.create_binary_image(
             result, '')
