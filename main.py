@@ -5,7 +5,15 @@ import widgets as wid
 import resources as res
 import segment_engine as seg
 import cv2
+from PIL import Image
+import numpy as np
 
+# parameters
+# path (change if necessary)
+OUT_BINARY_MASK = 'combined_binary_mask.png'
+OUT_COLOR_MASK = 'combined_color_mask.png'
+OUT_BINARY_SKELETON = 'skeleton_image.png'
+OUT_COLOR_SKELETON = 'skeleton_color.png'
 
 class CustomDoubleValidator(QDoubleValidator):
     def __init__(self, *args, **kwargs):
@@ -132,7 +140,16 @@ class CrackApp(QMainWindow):
         # self.comboBox.addItems(self.list_image)
         self.active_img = self.list_image[0]
         self.image_loaded = False
+        self.has_mask = False
         self.resolution = 0
+        self.image_w = 0
+        self.image_h = 0
+        self.crack_length = 0
+        self.output_binary_mask = OUT_BINARY_MASK
+        self.output_color_mask = OUT_COLOR_MASK
+        self.output_skeleton = OUT_BINARY_SKELETON
+        self.output_color_skeleton = OUT_COLOR_SKELETON
+
         # list of line measurements
         self.line_meas_list = []
 
@@ -156,6 +173,7 @@ class CrackApp(QMainWindow):
 
         # drawing ends
         self.viewer.endDrawing_line_meas.connect(self.get_line_meas)
+        self.viewer.endPainting.connect(self.update_image_mask)
         self.viewer.photoClicked.connect(self.get_path)
 
         if is_dark_theme:
@@ -196,10 +214,79 @@ class CrackApp(QMainWindow):
 
     # paint and erase __________________________________________
     def paint_mask(self):
-        pass
+        if self.actionPaint_mask.isChecked():
+            # change cursor
+            circle_cursor = self.viewer.create_circle_cursor(30)  # 30 pixels in diameter
+            self.viewer.setCursor(circle_cursor)
+            self.viewer.painting = True
+            self.viewer.eraser = False
+            self.point_selection = False
+            self.viewer.toggleDragMode()
+
+    def update_image_mask(self, coords):
+        if self.has_mask:
+            image = Image.open(self.output_binary_mask)
+            image_array = np.array(image)
+
+            if not self.viewer.eraser:
+                binary_image = seg.create_mask_from_paint(image_array, coords)
+            else:
+                binary_image = seg.remove_mask_from_paint(image_array, coords)
+
+            # save mask
+            image = Image.fromarray(binary_image)
+            image.save(self.output_binary_mask)
+            self.has_mask = True
+
+            # create painted color mask
+
+            color_image = seg.binary_to_color_mask(binary_image)
+            image = Image.fromarray(color_image)
+            image.save(self.output_color_mask)
+
+            self.pushButton_show_mask.setEnabled(True)
+            self.pushButton_show_skel.setEnabled(True)
+            self.pushButton_show_mask.setChecked(True)
+
+            self.update_view()
+
+        else:
+            if not self.viewer.eraser:
+                image = Image.open(self.image_path)
+                width, height = image.size
+
+                # Create an empty black image (binary) of the same dimension
+                black_image = np.zeros((height, width), dtype=np.uint8)
+
+                # use painted coordinates to create a new mask
+                binary_image = seg.create_mask_from_paint(black_image, coords)
+
+                # save mask
+                image = Image.fromarray(binary_image)
+                image.save(self.output_binary_mask)
+                self.has_mask = True
+
+                # create painted color mask
+                color_image = seg.binary_to_color_mask(binary_image)
+                image = Image.fromarray(color_image)
+                image.save(self.output_color_mask)
+
+                self.pushButton_show_mask.setEnabled(True)
+                self.pushButton_show_skel.setEnabled(True)
+                self.pushButton_show_mask.setChecked(True)
+
+                self.update_view()
+
 
     def erase_mask(self):
-        pass
+        if self.actionEraser_mask.isChecked():
+            # change cursor
+            circle_cursor = self.viewer.create_circle_cursor(30)  # 30 pixels in diameter
+            self.viewer.setCursor(circle_cursor)
+            self.viewer.painting = True
+            self.viewer.eraser = True
+            self.point_selection = False
+            self.viewer.toggleDragMode()
 
     # line measurement __________________________________________
     def toggle_line_meas(self):
@@ -214,6 +301,7 @@ class CrackApp(QMainWindow):
             self.viewer.setCursor(Qt.ArrowCursor)
             # activate drawing tool
             self.point_selection = False
+            self.viewer.painting = False
 
             self.viewer.line_meas = True
             self.viewer.toggleDragMode()
@@ -229,6 +317,7 @@ class CrackApp(QMainWindow):
     def path_meas(self):
         if self.actionMeasure_path.isChecked():
             self.viewer.point_selection = True
+            self.viewer.painting = False
 
             # change cursor
             circle_cursor = self.viewer.create_circle_cursor(30)  # 30 pixels in diameter
@@ -252,6 +341,7 @@ class CrackApp(QMainWindow):
         # switch back to hand tool
         self.viewer.point_selection = False
         self.viewer.line_meas = False
+        self.viewer.painting = False
 
         self.actionHand_selector.setChecked(True)
         self.viewer.toggleDragMode()
@@ -294,8 +384,21 @@ class CrackApp(QMainWindow):
         self.hand_pan()
 
         result = seg.get_segmentation_result(self.image_path)
-        self.crack_length, self.output_binary_mask, self.output_color_mask, self.output_skeleton, self.output_skel_color = seg.create_binary_image(
-            result, '')
+        binary = seg.create_binary_from_yolo(result)
+
+        color_mask = seg.binary_to_color_mask(binary)
+        skel = seg.binary_to_skeleton(binary)
+        color_skel = seg.binary_to_color_mask(skel)
+
+        # save the 4 images
+        image = Image.fromarray(binary)
+        image.save(self.output_binary_mask)
+        image = Image.fromarray(color_mask)
+        image.save(self.output_color_mask)
+        image = Image.fromarray(skel)
+        image.save(self.output_skeleton)
+        image = Image.fromarray(color_skel)
+        image.save(self.output_color_skeleton)
 
         # compute junctions from skeleton image
         self.junctions, self.endpoints = seg.find_junctions_endpoints(self.output_skeleton)
@@ -342,6 +445,8 @@ class CrackApp(QMainWindow):
         self.actionSegment.setEnabled(True)
         self.actionMeasure.setEnabled(True)
         self.actionSet_scale.setEnabled(True)
+        self.actionPaint_mask.setEnabled(True)
+        self.actionEraser_mask.setEnabled(True)
         self.actionHand_selector.setEnabled(True)
         self.actionHand_selector.setChecked(True)
 

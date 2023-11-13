@@ -31,7 +31,7 @@ def get_segmentation_result(img_path):
 
     return result
 
-def create_binary_image(result, output_folder):
+def create_binary_from_yolo(result):
     first_mask = result.object_prediction_list[0]
     print(first_mask)
     mask = np.asarray(first_mask.mask.bool_mask)
@@ -45,11 +45,9 @@ def create_binary_image(result, output_folder):
     # Now convert the combined mask to a binary image (uint8)
     binary_image = (combined_mask * 255).astype(np.uint8)
 
-    # Convert the binary image to a PIL Image and save it
-    image = Image.fromarray(binary_image)
-    output_binary_mask = os.path.join(output_folder, 'combined_binary_mask.png')
-    image.save(output_binary_mask)
+    return binary_image
 
+def binary_to_color_mask(binary_image):
     # Create an empty 3-channel image with the same dimensions as the binary image
     height, width = binary_image.shape
     color_image = np.zeros((height, width, 3), dtype=np.uint8)
@@ -58,10 +56,9 @@ def create_binary_image(result, output_folder):
     color_image[:, :, 2] = binary_image
 
     # Now color_image is a blue version of your binary image
-    image = Image.fromarray(color_image)
-    output_color_mask = os.path.join(output_folder, 'combined_color_mask.png')
-    image.save(output_color_mask)
+    return color_image
 
+def binary_to_skeleton(binary_image):
     # Skeletonize the image
     skeleton = skeletonize(binary_image)
 
@@ -71,22 +68,7 @@ def create_binary_image(result, output_folder):
     # Convert the skeletonized image to uint8 to save it
     skeleton_image = (skeleton * 255).astype(np.uint8)
 
-    # Convert the skeletonized binary image to a PIL Image and save it
-    image = Image.fromarray(skeleton_image)
-    output_skeleton = os.path.join(output_folder, 'skeleton_image.png')
-    image.save(output_skeleton)
-
-    color_image = np.zeros((height, width, 3), dtype=np.uint8)
-
-    # Set the blue channel
-    color_image[:, :, 0] = skeleton_image
-
-    # Now color_image is a blue version of your binary image
-    image = Image.fromarray(color_image)
-    output_skel_color = os.path.join(output_folder, 'skeleton_color.png')
-    image.save(output_skel_color)
-
-    return crack_length, output_binary_mask, output_color_mask, output_skeleton, output_skel_color
+    return skeleton_image
 
 
 def find_junctions_endpoints(skel_path):
@@ -198,3 +180,15 @@ def highlight_path(img_shape, path):
         highlighted_img[x, y] = 255
 
     return highlighted_img
+
+def create_mask_from_paint(img, coords):
+    # Set the corresponding pixels to white
+    img[coords[:, 0], coords[:, 1]] = 255
+
+    return img
+
+def remove_mask_from_paint(img, coords):
+    # Set the corresponding pixels to white
+    img[coords[:, 0], coords[:, 1]] = 0
+
+    return img

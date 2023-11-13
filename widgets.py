@@ -132,10 +132,43 @@ class ImageDialog(QDialog):
         self.layout().addWidget(label)
 
 
+def QPixmapFromItem(item):
+    """
+    Transform a QGraphicsitem into a Pixmap
+    :param item: QGraphicsItem
+    :return: QPixmap
+    """
+    pixmap = QPixmap(item.boundingRect().size().toSize())
+    pixmap.fill(Qt.transparent)
+    painter = QPainter(pixmap)
+    # this line seems to be needed for all items except of a LineItem...
+    painter.translate(-item.boundingRect().x(), -item.boundingRect().y())
+    painter.setRenderHint(QPainter.Antialiasing, True)
+    opt = QStyleOptionGraphicsItem()
+    item.paint(painter, opt)  # here in some cases the self is needed
+    return pixmap
+
+
+def QPixmapToArray(pixmap):
+    ## Get the size of the current pixmap
+    size = pixmap.size()
+    h = size.width()
+    w = size.height()
+
+    ## Get the QImage Item and convert it to a byte string
+    qimg = pixmap.toImage()
+    byte_str = qimg.bits().tobytes()
+
+    ## Using the np.frombuffer function to convert the byte string into an np array
+    img = np.frombuffer(byte_str, dtype=np.uint8).reshape((w, h, 4))
+
+    return img
+
+
 class MagnifyingGlass(QGraphicsEllipseItem):
     def __init__(self, size=200, parent=None):
         self._size = size
-        super().__init__(-self._size/2, -self._size/2, self._size, self._size, parent)
+        super().__init__(-self._size / 2, -self._size / 2, self._size, self._size, parent)
         self.setBrush(Qt.transparent)
         self.pen = QPen()
         self.pen.setStyle(Qt.DashDotLine)
@@ -144,7 +177,7 @@ class MagnifyingGlass(QGraphicsEllipseItem):
 
         self.setPen(Qt.NoPen)
         self.pixmap_item = QGraphicsPixmapItem(self)
-        self.pixmap_item.setPos(-self._size/2, -self._size/2)
+        self.pixmap_item.setPos(-self._size / 2, -self._size / 2)
         self.setZValue(1)
 
     def update_size(self):
@@ -168,10 +201,13 @@ class MagnifyingGlass(QGraphicsEllipseItem):
         # Set the masked pixmap to the pixmap item
         self.pixmap_item.setPixmap(pixmap)
 
+
 class PhotoViewer(QGraphicsView):
     photoClicked = Signal(list)
     endDrawing_rect = Signal()
     endDrawing_line_meas = Signal(QGraphicsLineItem, QGraphicsTextItem)
+    endPainting = Signal(np.ndarray)
+    endErasing = Signal()
 
     def __init__(self, parent):
         super(PhotoViewer, self).__init__(parent)
@@ -191,9 +227,6 @@ class PhotoViewer(QGraphicsView):
         self.sourceImage = QImage()
         self.destinationImage = QImage()
 
-        self.point_size = 15
-        self.text_size = 15
-
         self.scale_bar_length_mm = 1  # Length of the scale bar in mm
         self.mm_per_pixel = None  # Scale of the image in mm/pixel
 
@@ -203,12 +236,16 @@ class PhotoViewer(QGraphicsView):
         # tools activation
         self.line_meas = False
         self.point_selection = False
+        self.painting = False
+        self.eraser = False
 
         # current items
         self._current_point = None
         self._current_line_item = None
         self._current_text_item = None
+        self._current_path_item = None
 
+        # pens and brushes
         self.pen = QPen()
         self.pen.setStyle(Qt.DashDotLine)
         self.pen.setWidth(4)
@@ -223,6 +260,20 @@ class PhotoViewer(QGraphicsView):
         self.pen_yolo.setColor(self.meas_color)
         self.pen_yolo.setCapStyle(Qt.RoundCap)
         self.pen_yolo.setJoinStyle(Qt.RoundJoin)
+
+        # for painting functionalities
+        self.brush = QPen()
+        self.brush.setWidth(30)
+        self.brush.setColor(QColor(0, 255, 0, a=100))
+        self.brush.setCapStyle(Qt.RoundCap)
+        self.brush.setJoinStyle(Qt.RoundJoin)
+
+        # for painting functionalities
+        self.eraser_brush = QPen()
+        self.eraser_brush.setWidth(30)
+        self.eraser_brush.setColor(QColor(255, 0, 0, a=100))
+        self.eraser_brush.setCapStyle(Qt.RoundCap)
+        self.eraser_brush.setJoinStyle(Qt.RoundJoin)
 
         # initial text size
         self.text_font_size = 0
@@ -414,7 +465,7 @@ class PhotoViewer(QGraphicsView):
             self._photo.setPixmap(QPixmap())
 
     def toggleDragMode(self):
-        if self.line_meas or self.point_selection:
+        if self.line_meas or self.point_selection or self.painting:
             self.setDragMode(QGraphicsView.NoDrag)
         else:
             self.setDragMode(QGraphicsView.ScrollHandDrag)
@@ -535,7 +586,6 @@ class PhotoViewer(QGraphicsView):
         self.text_font_size = int(self.original_text_font_size * scale_factor)
         self.update_all_text_size()  # Function to update the text size in your view
 
-
     def update_magnifier_wheel(self, event):
         scene_pos = self.mapToScene(event.position().toPoint())
 
@@ -599,7 +649,6 @@ class PhotoViewer(QGraphicsView):
             self.update_font_size()
             self.update_all_text_size()
 
-
     def mousePressEvent(self, event):
         if self.line_meas:
             self._current_line_item = QGraphicsLineItem()
@@ -614,9 +663,24 @@ class PhotoViewer(QGraphicsView):
 
             self._current_line_item.setLine(QLineF(self.origin, self.origin))
 
+        # detect cracks by click
         elif self.point_selection:
             self._current_point = self.mapToScene(event.pos())
             self.photoClicked.emit([int(self._current_point.x()), int(self._current_point.y())])
+
+        # paint crack on mask
+        elif self.painting:
+            self.origin = self.mapToScene(event.pos())
+            self._current_path = QPainterPath(self.origin)
+
+            self._current_path_item = QGraphicsPathItem()
+            self._current_path_item.setPath(self._current_path)
+            if self.eraser:
+                self._current_path_item.setPen(self.eraser_brush)
+            else:
+                self._current_path_item.setPen(self.brush)
+
+            self._scene.addItem(self._current_path_item)
 
         else:
             if self.has_photo():
@@ -651,12 +715,18 @@ class PhotoViewer(QGraphicsView):
 
                 text_width = self._current_text_item.boundingRect().width()
                 text_height = self._current_text_item.boundingRect().height()
-                self._current_text_item.setPos(mid_x - text_width / 2, mid_y - text_height / 2) #TODO Improve
+                self._current_text_item.setPos(mid_x - text_width / 2, mid_y - text_height / 2)  # TODO Improve
                 self._current_text_item.setDefaultTextColor(QColor("blue"))
                 font = QFont()
                 font.setPointSize(self.text_font_size)
                 font.setBold(True)  # Make the text bold
                 self._current_text_item.setFont(font)
+
+        elif self.painting:
+            if self._current_path_item is not None:
+                new_coord = self.mapToScene(event.pos())
+                self._current_path.lineTo(new_coord)
+                self._current_path_item.setPath(self._current_path)
 
         else:
             if self.mouse_pressed:
@@ -686,7 +756,6 @@ class PhotoViewer(QGraphicsView):
                 self.magnifying_glass.set_pixmap(magnified_pixmap)
                 self.magnifying_glass.show()
 
-
         super(PhotoViewer, self).mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
@@ -702,10 +771,38 @@ class PhotoViewer(QGraphicsView):
             self._current_line_item = None
             self._current_text_item = None
 
+        elif self.painting:
+            if self._current_path_item is not None:
+                # create pixmap from item
+                pixmap = QPixmapFromItem(self._current_path_item)
+                image = QPixmapToArray(pixmap)
+                gray = np.dot(image[..., :3], [0.2989, 0.5870, 0.1140])
+
+                coords = np.column_stack(np.where(gray > 2))
+
+                bb_rect = self._current_path_item.sceneBoundingRect()
+                top_left = bb_rect.topLeft()
+
+                limit_row = int(top_left.x())
+                limit_col = int(top_left.y())
+                print(f'limits = {limit_row}, {limit_col}')
+
+                coords[:, 0] += limit_col
+                coords[:, 1] += limit_row
+
+                self.endPainting.emit(coords)
+                print('brush ROI added')
+
+                # remove path
+                self._scene.removeItem(self._current_path_item)
+
+
+            self.origin = QPoint()
+            self._current_path_item = None
+
         if event.button() == Qt.RightButton:
             self.mouse_pressed = False
             self.magnifying_glass.hide()
-
 
         super(PhotoViewer, self).mouseReleaseEvent(event)
 
@@ -719,6 +816,7 @@ class PhotoViewer(QGraphicsView):
         middle_point = ((min_x + max_x) / 2, (min_y + max_y) / 2)
 
         return extreme_points, middle_point
+
     def add_path_to_scene(self, path):
         if len(path) < 2:
             return  # Need at least two points to draw a path
@@ -754,4 +852,3 @@ class PhotoViewer(QGraphicsView):
         font.setBold(True)  # Make the text bold
         text_item.setFont(font)
         self._scene.addItem(text_item)
-

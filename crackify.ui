@@ -299,11 +299,23 @@
    </property>
   </action>
   <action name="actionPaint_mask">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
    <property name="text">
     <string>Paint Mask</string>
    </property>
   </action>
   <action name="actionEraser_mask">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
    <property name="text">
     <string>Eraser Mask</string>
    </property>
