@@ -116,6 +116,8 @@ class CrackApp(QMainWindow):
         ag.addAction(self.actionMeasure)
         ag.addAction(self.actionMeasure_path)
         ag.addAction(self.actionHand_selector)
+        ag.addAction(self.actionPaint_mask)
+        ag.addAction(self.actionEraser_mask)
 
         # mutually exclusive pushbuttons
         self.exclusiveGroup = ExclusiveButtonGroup()
@@ -141,6 +143,8 @@ class CrackApp(QMainWindow):
         self.actionMeasure.triggered.connect(self.line_meas)
         self.actionMeasure_path.triggered.connect(self.path_meas)
         self.actionHand_selector.triggered.connect(self.hand_pan)
+        self.actionPaint_mask.triggered.connect(self.paint_mask)
+        self.actionEraser_mask.triggered.connect(self.erase_mask)
 
         # pushbuttons
         self.pushButton_show_image.clicked.connect(self.update_view)
@@ -166,6 +170,8 @@ class CrackApp(QMainWindow):
         self.add_icon(res.find(f'img/ruler{suf}.png'), self.actionMeasure)
         self.add_icon(res.find(f'img/magic{suf}.png'), self.actionMeasure_path)
         self.add_icon(res.find(f'img/size{suf}.png'), self.actionSet_scale)
+        self.add_icon(res.find(f'img/brush{suf}.png'), self.actionPaint_mask)
+        self.add_icon(res.find(f'img/eraser{suf}.png'), self.actionEraser_mask)
         # push buttons
         self.add_icon(res.find(f'img/photo{suf2}.png'), self.pushButton_show_image)
         self.add_icon(res.find(f'img/skel{suf2}.png'), self.pushButton_show_skel)
@@ -187,6 +193,13 @@ class CrackApp(QMainWindow):
             print(f'New resolution is {self.resolution} mm/pixel')
             self.viewer.mm_per_pixel = self.resolution
 
+
+    # paint and erase __________________________________________
+    def paint_mask(self):
+        pass
+
+    def erase_mask(self):
+        pass
 
     # line measurement __________________________________________
     def toggle_line_meas(self):
@@ -419,6 +432,10 @@ def main(argv=None):
             QPushButton:checked {
                 background-color: lightblue;
             }
+            QPushButton:disabled {
+                background-color: #666;
+            }
+            QWidget { background-color: #444; }
             """)
 
     # create the main window

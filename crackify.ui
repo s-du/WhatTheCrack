@@ -233,6 +233,9 @@
    <addaction name="actionMeasure"/>
    <addaction name="actionMeasure_path"/>
    <addaction name="separator"/>
+   <addaction name="actionPaint_mask"/>
+   <addaction name="actionEraser_mask"/>
+   <addaction name="separator"/>
    <addaction name="actionSet_scale"/>
   </widget>
   <action name="actionLoad_image">
@@ -293,6 +296,16 @@
    </property>
    <property name="toolTip">
     <string>Measure a crack path between two nodes</string>
+   </property>
+  </action>
+  <action name="actionPaint_mask">
+   <property name="text">
+    <string>Paint Mask</string>
+   </property>
+  </action>
+  <action name="actionEraser_mask">
+   <property name="text">
+    <string>Eraser Mask</string>
    </property>
   </action>
  </widget>
