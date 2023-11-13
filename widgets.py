@@ -147,6 +147,9 @@ class MagnifyingGlass(QGraphicsEllipseItem):
         self.pixmap_item.setPos(-self._size/2, -self._size/2)
         self.setZValue(1)
 
+    def update_size(self):
+        self.pixmap_item.setPos(-self._size / 2, -self._size / 2)
+
     def set_pixmap(self, pixmap):
         # Create an elliptical mask for the pixmap
         mask_image = QImage(pixmap.size(), QImage.Format_Alpha8)
@@ -232,7 +235,7 @@ class PhotoViewer(QGraphicsView):
         self.brush_cur = QCursor(pixmap_scaled)
 
         # magnifying glass
-        self.magnify = False
+        self.mouse_pressed = False
 
         self.magnifying_glass_size = 400  # Adjust this value to change the size
         self.magnifying_glass = MagnifyingGlass(self.magnifying_glass_size)
@@ -399,8 +402,8 @@ class PhotoViewer(QGraphicsView):
             self.scene_image = pixmap.toImage()
 
             # initial text size
-            self.original_text_font_size = int(self.scene().width() / 75)
-            self.text_font_size = int(self.scene().width() / 75)
+            self.original_text_font_size = int(self.scene().width() / 160)
+            self.text_font_size = int(self.scene().width() / 160)
 
             if fit_view:
                 self.fitInView()
@@ -411,8 +414,7 @@ class PhotoViewer(QGraphicsView):
             self._photo.setPixmap(QPixmap())
 
     def toggleDragMode(self):
-        print(self.line_meas, self.point_selection)
-        if self.line_meas or self.point_selection or self.magnify:
+        if self.line_meas or self.point_selection:
             self.setDragMode(QGraphicsView.NoDrag)
         else:
             self.setDragMode(QGraphicsView.ScrollHandDrag)
@@ -533,10 +535,51 @@ class PhotoViewer(QGraphicsView):
         self.text_font_size = int(self.original_text_font_size * scale_factor)
         self.update_all_text_size()  # Function to update the text size in your view
 
+
+    def update_magnifier_wheel(self, event):
+        scene_pos = self.mapToScene(event.position().toPoint())
+
+        # Adjust these values for desired magnification
+        magnify_factor = 4
+
+        # Calculate the dimensions of the sub-pixmap to grab
+        grab_width = self.magnifying_glass_size // magnify_factor
+        grab_height = self.magnifying_glass_size // magnify_factor
+
+        # Calculate the top-left corner of the sub-pixmap to grab, such that the cursor is centered
+        grab_x = scene_pos.x() - grab_width / 2
+        grab_y = scene_pos.y() - grab_height / 2
+
+        # Extract the portion of the rendered scene around the cursor
+        sub_image = self.scene_image.copy(grab_x, grab_y, grab_width, grab_height)
+
+        # Convert QImage to QPixmap and scale it to achieve magnification
+        magnified_pixmap = QPixmap.fromImage(sub_image).scaled(self.magnifying_glass_size,
+                                                               self.magnifying_glass_size,
+                                                               Qt.KeepAspectRatio, Qt.SmoothTransformation)
+
+        # Update the magnifying glass
+        self.magnifying_glass.setPos(scene_pos)
+        self.magnifying_glass.set_pixmap(magnified_pixmap)
+
     # mouse events
     def wheelEvent(self, event):
-        print(self._zoom)
-        if self.has_photo():
+        if event.modifiers() & Qt.ControlModifier:
+            if event.angleDelta().y() > 0:
+                factor = 1.25
+                self.magnifying_glass_size *= factor
+                self.magnifying_glass._size = self.magnifying_glass_size
+                self.magnifying_glass.update_size()
+                self.update_magnifier_wheel(event)
+
+            else:
+                factor = 0.8
+                self.magnifying_glass_size *= factor
+                self.magnifying_glass._size = self.magnifying_glass_size
+                self.magnifying_glass.update_size()
+                self.update_magnifier_wheel(event)
+
+        elif self.has_photo():
             if event.angleDelta().y() > 0:
                 factor = 1.25
                 self._zoom += 1
@@ -545,7 +588,6 @@ class PhotoViewer(QGraphicsView):
                 self._zoom -= 1
             if self._zoom > 0:
                 self.scale(factor, factor)
-                self.update_all_text_size()
 
             elif self._zoom == 0:
                 self.fitInView()
@@ -555,6 +597,7 @@ class PhotoViewer(QGraphicsView):
 
             self.viewport().update()
             self.update_font_size()
+            self.update_all_text_size()
 
 
     def mousePressEvent(self, event):
@@ -576,8 +619,9 @@ class PhotoViewer(QGraphicsView):
             self.photoClicked.emit([int(self._current_point.x()), int(self._current_point.y())])
 
         else:
-            if event.button() == Qt.RightButton:
-                self.mouse_pressed = True
+            if self.has_photo():
+                if event.button() == Qt.RightButton:
+                    self.mouse_pressed = True
 
         super(PhotoViewer, self).mousePressEvent(event)
 
@@ -616,7 +660,6 @@ class PhotoViewer(QGraphicsView):
 
         else:
             if self.mouse_pressed:
-                self._scene.setSceneRect(self._photo.pixmap().rect())
                 scene_pos = self.mapToScene(event.pos())
 
                 # Adjust these values for desired magnification
@@ -666,6 +709,16 @@ class PhotoViewer(QGraphicsView):
 
         super(PhotoViewer, self).mouseReleaseEvent(event)
 
+    def find_extreme_and_middle_points(self, path):
+        min_x = min(path, key=lambda p: p[0])[0]
+        max_x = max(path, key=lambda p: p[0])[0]
+        min_y = min(path, key=lambda p: p[1])[1]
+        max_y = max(path, key=lambda p: p[1])[1]
+
+        extreme_points = ((min_x, min_y), (max_x, max_y))
+        middle_point = ((min_x + max_x) / 2, (min_y + max_y) / 2)
+
+        return extreme_points, middle_point
     def add_path_to_scene(self, path):
         if len(path) < 2:
             return  # Need at least two points to draw a path
@@ -677,4 +730,28 @@ class PhotoViewer(QGraphicsView):
             painter_path.lineTo(QPointF(y, x))  # Add line to each point
 
         path_item = QGraphicsPathItem(painter_path)
+        path_item.setPen(self.pen_yolo)
         self._scene.addItem(path_item)
+
+        # print length of path
+        text_item = QGraphicsTextItem()  # Format the distance to 2 decimal places
+        text_item.setZValue(1)
+        if self.mm_per_pixel is None:
+            text_item.setPlainText(f'{len(path):.2f} pixels')
+
+        else:
+            text_item.setPlainText(
+                f'{len(path):.2f} pixels \n {len(path) * self.mm_per_pixel:.2f} mm')
+
+        # get middle point of path
+        extreme_points, middle_point = self.find_extreme_and_middle_points(path)
+        text_item.setPos(middle_point[1], middle_point[0])
+
+        # style
+        text_item.setDefaultTextColor(QColor("blue"))
+        font = QFont()
+        font.setPointSize(self.text_font_size)
+        font.setBold(True)  # Make the text bold
+        text_item.setFont(font)
+        self._scene.addItem(text_item)
+
