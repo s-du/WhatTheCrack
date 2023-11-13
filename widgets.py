@@ -233,6 +233,8 @@ class PhotoViewer(QGraphicsView):
         self.setMouseTracking(True)
         self.origin = QPoint()
 
+        self.hand_drag = True
+
         # tools activation
         self.line_meas = False
         self.point_selection = False
@@ -448,7 +450,6 @@ class PhotoViewer(QGraphicsView):
     def setPhoto(self, pixmap=None, fit_view=False):
         if pixmap and not pixmap.isNull():
             self._empty = False
-            self.setDragMode(QGraphicsView.ScrollHandDrag)
             self._photo.setPixmap(pixmap)
             self.scene_image = pixmap.toImage()
 
@@ -467,9 +468,10 @@ class PhotoViewer(QGraphicsView):
     def toggleDragMode(self):
         if self.line_meas or self.point_selection or self.painting:
             self.setDragMode(QGraphicsView.NoDrag)
+            self.hand_drag = False
         else:
             self.setDragMode(QGraphicsView.ScrollHandDrag)
-            print('Scroll Hand!')
+            self.hand_drag = True
 
     def add_poly(self, coordinates):
         # Create a QPolygonF from the coordinates
