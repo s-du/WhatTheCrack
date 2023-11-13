@@ -287,8 +287,11 @@ class PhotoViewer(QGraphicsView):
         pixmap_scaled = self.cur_pixmap.scaledToWidth(12)
         self.brush_cur = QCursor(pixmap_scaled)
 
+        self.prefered_cursor_diam = 30
+
         # magnifying glass
         self.right_mouse_pressed = False
+        self.middle_mouse_pressed = False
 
         self.magnifying_glass_size = 400  # Adjust this value to change the size
         self.magnifying_glass = MagnifyingGlass(self.magnifying_glass_size)
@@ -633,6 +636,32 @@ class PhotoViewer(QGraphicsView):
                 self.magnifying_glass.update_size()
                 self.update_magnifier_wheel(event)
 
+        elif event.modifiers() & Qt.ShiftModifier:
+            if self.painting:
+                if event.angleDelta().y() > 0:
+                    factor = 1.25
+                    self.prefered_cursor_diam *= factor
+                    self.cursor_diameter *= factor
+                    cursor = self.create_circle_cursor(self.cursor_diameter)
+                    self.setCursor(cursor)
+
+                    # adapt brush:
+                    print(self.prefered_cursor_diam)
+                    self.brush.setWidth(self.prefered_cursor_diam)
+                    self.eraser_brush.setWidth(self.prefered_cursor_diam)
+
+
+                else:
+                    factor = 0.8
+                    self.prefered_cursor_diam *= factor
+                    self.cursor_diameter *= factor
+                    cursor = self.create_circle_cursor(self.cursor_diameter)
+                    self.setCursor(cursor)
+
+                    self.brush.setWidth(self.prefered_cursor_diam)
+                    self.eraser_brush.setWidth(self.prefered_cursor_diam)
+
+
         elif self.has_photo():
             if event.angleDelta().y() > 0:
                 factor = 1.25
@@ -658,14 +687,12 @@ class PhotoViewer(QGraphicsView):
                     cursor = self.create_circle_cursor(self.cursor_diameter)
                     self.setCursor(cursor)
                 else:
-                    cursor = self.create_circle_cursor(30)
+                    cursor = self.create_circle_cursor(self.prefered_cursor_diam)
                     self.setCursor(cursor)
-
 
             self.viewport().update()
             self.update_font_size()
             self.update_all_text_size()
-
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
@@ -702,21 +729,50 @@ class PhotoViewer(QGraphicsView):
                 self._scene.addItem(self._current_path_item)
 
         elif event.button() == Qt.RightButton:
+
             if self.has_photo():
                 self.right_mouse_pressed = True
+                print('right click!')
 
         elif event.button() == Qt.MiddleButton:
-            self.middle_moue_pressed = True
+            self.middle_mouse_pressed = True
             self._lastMousePosition = event.pos()
 
         super(PhotoViewer, self).mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
-        if self.middle_moue_pressed:
+        if self.middle_mouse_pressed:
             delta = event.pos() - self._lastMousePosition
             self._lastMousePosition = event.pos()
             self.horizontalScrollBar().setValue(self.horizontalScrollBar().value() - delta.x())
             self.verticalScrollBar().setValue(self.verticalScrollBar().value() - delta.y())
+
+        elif self.right_mouse_pressed:
+            scene_pos = self.mapToScene(event.pos())
+
+            # Adjust these values for desired magnification
+            magnify_factor = 4
+
+            # Calculate the dimensions of the sub-pixmap to grab
+            grab_width = self.magnifying_glass_size // magnify_factor
+            grab_height = self.magnifying_glass_size // magnify_factor
+
+            # Calculate the top-left corner of the sub-pixmap to grab, such that the cursor is centered
+            grab_x = scene_pos.x() - grab_width / 2
+            grab_y = scene_pos.y() - grab_height / 2
+
+            # Extract the portion of the rendered scene around the cursor
+            sub_image = self.scene_image.copy(grab_x, grab_y, grab_width, grab_height)
+
+            # Convert QImage to QPixmap and scale it to achieve magnification
+            magnified_pixmap = QPixmap.fromImage(sub_image).scaled(self.magnifying_glass_size,
+                                                                   self.magnifying_glass_size,
+                                                                   Qt.KeepAspectRatio, Qt.SmoothTransformation)
+
+            # Update the magnifying glass
+            self.magnifying_glass.setPos(scene_pos)
+            self.magnifying_glass.set_pixmap(magnified_pixmap)
+            self.magnifying_glass.show()
 
         elif self.line_meas:
             if self._current_line_item is not None:
@@ -756,39 +812,15 @@ class PhotoViewer(QGraphicsView):
                 self._current_path.lineTo(new_coord)
                 self._current_path_item.setPath(self._current_path)
 
-        else:
-            if self.right_mouse_pressed:
-                scene_pos = self.mapToScene(event.pos())
-
-                # Adjust these values for desired magnification
-                magnify_factor = 4
-
-                # Calculate the dimensions of the sub-pixmap to grab
-                grab_width = self.magnifying_glass_size // magnify_factor
-                grab_height = self.magnifying_glass_size // magnify_factor
-
-                # Calculate the top-left corner of the sub-pixmap to grab, such that the cursor is centered
-                grab_x = scene_pos.x() - grab_width / 2
-                grab_y = scene_pos.y() - grab_height / 2
-
-                # Extract the portion of the rendered scene around the cursor
-                sub_image = self.scene_image.copy(grab_x, grab_y, grab_width, grab_height)
-
-                # Convert QImage to QPixmap and scale it to achieve magnification
-                magnified_pixmap = QPixmap.fromImage(sub_image).scaled(self.magnifying_glass_size,
-                                                                       self.magnifying_glass_size,
-                                                                       Qt.KeepAspectRatio, Qt.SmoothTransformation)
-
-                # Update the magnifying glass
-                self.magnifying_glass.setPos(scene_pos)
-                self.magnifying_glass.set_pixmap(magnified_pixmap)
-                self.magnifying_glass.show()
-
         super(PhotoViewer, self).mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.MiddleButton:
-            self.middle_moue_pressed = False
+            self.middle_mouse_pressed = False
+
+        elif event.button() == Qt.RightButton:
+            self.right_mouse_pressed = False
+            self.magnifying_glass.hide()
 
         elif self.line_meas:
             self.line_meas = False
@@ -827,13 +859,8 @@ class PhotoViewer(QGraphicsView):
                 # remove path
                 self._scene.removeItem(self._current_path_item)
 
-
             self.origin = QPoint()
             self._current_path_item = None
-
-        if event.button() == Qt.RightButton:
-            self.right_mouse_pressed = False
-            self.magnifying_glass.hide()
 
         super(PhotoViewer, self).mouseReleaseEvent(event)
 
