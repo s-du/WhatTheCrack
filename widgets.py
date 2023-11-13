@@ -288,7 +288,7 @@ class PhotoViewer(QGraphicsView):
         self.brush_cur = QCursor(pixmap_scaled)
 
         # magnifying glass
-        self.mouse_pressed = False
+        self.right_mouse_pressed = False
 
         self.magnifying_glass_size = 400  # Adjust this value to change the size
         self.magnifying_glass = MagnifyingGlass(self.magnifying_glass_size)
@@ -410,6 +410,8 @@ class PhotoViewer(QGraphicsView):
 
     def create_circle_cursor(self, diameter):
         # Create a QPixmap with a transparent background
+        self.cursor_diameter = diameter
+
         pixmap = QPixmap(diameter, diameter)
         pixmap.fill(Qt.transparent)
 
@@ -635,9 +637,11 @@ class PhotoViewer(QGraphicsView):
             if event.angleDelta().y() > 0:
                 factor = 1.25
                 self._zoom += 1
+
             else:
                 factor = 0.8
                 self._zoom -= 1
+
             if self._zoom > 0:
                 self.scale(factor, factor)
 
@@ -647,52 +651,74 @@ class PhotoViewer(QGraphicsView):
             else:
                 self._zoom = 0
 
+            # adapt paint cursor
+            if self.painting:
+                if self._zoom > 0:
+                    self.cursor_diameter *= factor
+                    cursor = self.create_circle_cursor(self.cursor_diameter)
+                    self.setCursor(cursor)
+                else:
+                    cursor = self.create_circle_cursor(30)
+                    self.setCursor(cursor)
+
+
             self.viewport().update()
             self.update_font_size()
             self.update_all_text_size()
 
+
     def mousePressEvent(self, event):
-        if self.line_meas:
-            self._current_line_item = QGraphicsLineItem()
-            self._current_line_item.setPen(self.pen_yolo)
+        if event.button() == Qt.LeftButton:
+            if self.line_meas:
+                self._current_line_item = QGraphicsLineItem()
+                self._current_line_item.setPen(self.pen_yolo)
 
-            self._current_text_item = QGraphicsTextItem()  # Format the distance to 2 decimal places
-            self._current_text_item.setZValue(1)
-            self._scene.addItem(self._current_text_item)
+                self._current_text_item = QGraphicsTextItem()  # Format the distance to 2 decimal places
+                self._current_text_item.setZValue(1)
+                self._scene.addItem(self._current_text_item)
 
-            self._scene.addItem(self._current_line_item)
-            self.origin = self.mapToScene(event.pos())
+                self._scene.addItem(self._current_line_item)
+                self.origin = self.mapToScene(event.pos())
 
-            self._current_line_item.setLine(QLineF(self.origin, self.origin))
+                self._current_line_item.setLine(QLineF(self.origin, self.origin))
 
-        # detect cracks by click
-        elif self.point_selection:
-            self._current_point = self.mapToScene(event.pos())
-            self.photoClicked.emit([int(self._current_point.x()), int(self._current_point.y())])
+            # detect cracks by click
+            elif self.point_selection:
+                self._current_point = self.mapToScene(event.pos())
+                self.photoClicked.emit([int(self._current_point.x()), int(self._current_point.y())])
 
-        # paint crack on mask
-        elif self.painting:
-            self.origin = self.mapToScene(event.pos())
-            self._current_path = QPainterPath(self.origin)
+            # paint crack on mask
+            elif self.painting:
+                self.origin = self.mapToScene(event.pos())
+                self._current_path = QPainterPath(self.origin)
 
-            self._current_path_item = QGraphicsPathItem()
-            self._current_path_item.setPath(self._current_path)
-            if self.eraser:
-                self._current_path_item.setPen(self.eraser_brush)
-            else:
-                self._current_path_item.setPen(self.brush)
+                self._current_path_item = QGraphicsPathItem()
+                self._current_path_item.setPath(self._current_path)
+                if self.eraser:
+                    self._current_path_item.setPen(self.eraser_brush)
+                else:
+                    self._current_path_item.setPen(self.brush)
 
-            self._scene.addItem(self._current_path_item)
+                self._scene.addItem(self._current_path_item)
 
-        else:
+        elif event.button() == Qt.RightButton:
             if self.has_photo():
-                if event.button() == Qt.RightButton:
-                    self.mouse_pressed = True
+                self.right_mouse_pressed = True
+
+        elif event.button() == Qt.MiddleButton:
+            self.middle_moue_pressed = True
+            self._lastMousePosition = event.pos()
 
         super(PhotoViewer, self).mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
-        if self.line_meas:
+        if self.middle_moue_pressed:
+            delta = event.pos() - self._lastMousePosition
+            self._lastMousePosition = event.pos()
+            self.horizontalScrollBar().setValue(self.horizontalScrollBar().value() - delta.x())
+            self.verticalScrollBar().setValue(self.verticalScrollBar().value() - delta.y())
+
+        elif self.line_meas:
             if self._current_line_item is not None:
                 self.new_coord = self.mapToScene(event.pos())
                 self._current_line_item.setLine(QLineF(self.origin, self.new_coord))
@@ -731,7 +757,7 @@ class PhotoViewer(QGraphicsView):
                 self._current_path_item.setPath(self._current_path)
 
         else:
-            if self.mouse_pressed:
+            if self.right_mouse_pressed:
                 scene_pos = self.mapToScene(event.pos())
 
                 # Adjust these values for desired magnification
@@ -761,7 +787,10 @@ class PhotoViewer(QGraphicsView):
         super(PhotoViewer, self).mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
-        if self.line_meas:
+        if event.button() == Qt.MiddleButton:
+            self.middle_moue_pressed = False
+
+        elif self.line_meas:
             self.line_meas = False
 
             if self._current_line_item is not None:
@@ -803,7 +832,7 @@ class PhotoViewer(QGraphicsView):
             self._current_path_item = None
 
         if event.button() == Qt.RightButton:
-            self.mouse_pressed = False
+            self.right_mouse_pressed = False
             self.magnifying_glass.hide()
 
         super(PhotoViewer, self).mouseReleaseEvent(event)

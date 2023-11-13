@@ -244,6 +244,7 @@ class CrackApp(QMainWindow):
             self.pushButton_show_mask.setEnabled(True)
             self.pushButton_show_skel.setEnabled(True)
             self.pushButton_show_mask.setChecked(True)
+            self.actionMeasure_path.setEnabled(True)
 
             self.update_view()
 
@@ -263,6 +264,7 @@ class CrackApp(QMainWindow):
                 self.pushButton_show_mask.setEnabled(True)
                 self.pushButton_show_skel.setEnabled(True)
                 self.pushButton_show_mask.setChecked(True)
+                self.actionMeasure_path.setEnabled(True)
 
                 self.has_mask = True
                 self.update_view()
