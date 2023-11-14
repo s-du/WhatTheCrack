@@ -6,7 +6,6 @@ from PySide6.QtWidgets import *
 from PySide6.QtUiTools import QUiLoader
 import resources as res
 
-
 class UiLoader(QUiLoader):
     """
     Subclass :class:`~PySide.QtUiTools.QUiLoader` to create the user interface
@@ -258,7 +257,7 @@ class PhotoViewer(QGraphicsView):
         self.meas_color = QColor(0, 100, 255, a=255)
         self.pen_yolo = QPen()
         # self.pen.setStyle(Qt.DashDotLine)
-        self.pen_yolo.setWidth(2)
+        self.pen_yolo.setWidth(3)
         self.pen_yolo.setColor(self.meas_color)
         self.pen_yolo.setCapStyle(Qt.RoundCap)
         self.pen_yolo.setJoinStyle(Qt.RoundJoin)
@@ -279,6 +278,7 @@ class PhotoViewer(QGraphicsView):
 
         # initial text size
         self.text_font_size = 0
+        self.line_size = 0
 
         # custom cursor
         # define custom cursor (if needed)
@@ -462,6 +462,10 @@ class PhotoViewer(QGraphicsView):
             self.original_text_font_size = int(self.scene().width() / 160)
             self.text_font_size = int(self.scene().width() / 160)
 
+            # intial line size
+            self.line_size = int(self.text_font_size/ 4)
+            self.pen_yolo.setWidth(self.line_size)
+
             if fit_view:
                 self.fitInView()
 
@@ -583,7 +587,15 @@ class PhotoViewer(QGraphicsView):
                 text_height = item.boundingRect().height()
                 # item.setPos(mid_x - text_width / 2, mid_y - text_height / 2)
 
-    def update_font_size(self):
+    def update_all_line_size(self):
+        print(f'update line size: {self.line_size}')
+        for item in self._scene.items():
+            if isinstance(item, QGraphicsLineItem) or isinstance(item, QGraphicsPathItem):
+                self.pen_yolo.setWidth(self.line_size)
+                item.setPen(self.pen_yolo)
+
+
+    def update_font_and_line_size(self):
         # Adjust font size based on the zoom level
         if self._zoom >= 0:
             scale_factor = 1 / (1 + 0.25 * self._zoom)  # Adjust scaling factor as needed
@@ -591,7 +603,11 @@ class PhotoViewer(QGraphicsView):
             scale_factor = 1 + abs(self._zoom) * 0.2  # Adjust scaling factor for zoom out
 
         self.text_font_size = int(self.original_text_font_size * scale_factor)
+        self.line_size = int(self.text_font_size/4)
+
         self.update_all_text_size()  # Function to update the text size in your view
+        self.update_all_line_size()
+
 
     def update_magnifier_wheel(self, event):
         scene_pos = self.mapToScene(event.position().toPoint())
@@ -691,7 +707,7 @@ class PhotoViewer(QGraphicsView):
                     self.setCursor(cursor)
 
             self.viewport().update()
-            self.update_font_size()
+            self.update_font_and_line_size()
             self.update_all_text_size()
 
     def mousePressEvent(self, event):

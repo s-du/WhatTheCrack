@@ -349,19 +349,24 @@ class CrackApp(QMainWindow):
     def update_view(self):
         if self.pushButton_show_image.isChecked():
             if self.pushButton_show_mask.isChecked():
-                self.viewer.compose_mask_image(self.output_color_mask)
-                self.viewer.clean_scene()
+                if self.has_mask:
+                    self.viewer.compose_mask_image(self.output_color_mask)
+                    self.viewer.clean_scene()
             elif self.pushButton_show_skel.isChecked():
                 self.viewer.compose_mask_image(self.output_color_skeleton)
                 # add markers to image
                 self.viewer.add_nodes(self.junctions, self.endpoints)
             else:
                 self.viewer.clean_scene()
-                self.viewer.setPhoto(QPixmap(self.image_path), fit_view=True)
+                self.viewer.setPhoto(QPixmap(self.image_path))
         else:
             if self.pushButton_show_mask.isChecked():
-                self.viewer.clean_scene()
-                self.viewer.setPhoto(QPixmap(self.output_color_mask))
+                if self.has_mask:
+                    self.viewer.compose_mask_image(self.output_color_mask)
+                    self.viewer.clean_scene()
+                    self.viewer.clean_scene()
+                    self.viewer.setPhoto(QPixmap(self.output_color_mask))
+
             elif self.pushButton_show_skel.isChecked():
                 self.viewer.setPhoto(QPixmap(self.output_color_skeleton))
                 # add markers to image
@@ -377,7 +382,7 @@ class CrackApp(QMainWindow):
                 # Convert the white QImage to QPixmap
                 white_pixmap = QPixmap.fromImage(white_image)
                 self.viewer.clean_scene()
-                self.viewer.setPhoto(white_pixmap, fit_view=True)
+                self.viewer.setPhoto(white_pixmap)
 
 
     def compute_all_outputs_from_binary(self, binary):

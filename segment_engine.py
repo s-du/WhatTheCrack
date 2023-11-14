@@ -109,8 +109,6 @@ def find_closest_white_pixel(img, x, y, radius):
     return closest_pixel
 
 def find_path(img, x, y, junctions, endpoints):
-    print(junctions)
-    print(endpoints)
     if img[x, y] == 0:  # Check if the starting pixel is part of the skeleton
         return []
 
