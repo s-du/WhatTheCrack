@@ -331,7 +331,7 @@ class CrackApp(QMainWindow):
 
         close_pixel = seg.find_closest_white_pixel(img[:, :, 1], x, y, 30)
         if close_pixel is not None:
-            path = seg.find_path(img[:, :, 1], close_pixel[0], close_pixel[1], self.junctions, self.endpoints)
+            path = seg.find_path_bis(close_pixel[0], close_pixel[1], self.graph, self.lookup_table)
 
             # highlighted_img = seg.highlight_path(img.shape, path)
             self.viewer.add_path_to_scene(path)
@@ -402,6 +402,10 @@ class CrackApp(QMainWindow):
 
         # compute junctions from skeleton image
         self.junctions, self.endpoints = seg.find_junctions_endpoints(self.output_skeleton)
+        self.graph = seg.build_graph(self.junctions, self.endpoints, skel)
+        self.lookup_table = seg.segment_lookup_table(self.graph)
+
+        # seg.visualize_graph(self.graph, skel)
 
     def go_segment(self):
         # execute YOLO script

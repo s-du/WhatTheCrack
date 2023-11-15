@@ -10,6 +10,8 @@ import os
 import resources as res
 import cv2
 import networkx as nx
+import matplotlib.pyplot as plt
+
 
 
 model_path = res.find('other/best.pt')
@@ -211,36 +213,39 @@ def build_graph(junctions, endpoints, skel):
         ]
         return [n for n in neighbors if skel[n] == 255]
 
-    # Mark all junctions and endpoints as visited initially
-    visited = set(tuple(p) for p in np.vstack([junctions, endpoints]))
+    # Mark all junctions as visited initially
+    visited_junctions = set(tuple(p) for p in junctions)
 
     for endpoint in endpoints:
+        print(f'endpoint: {endpoint}')
         start = tuple(endpoint)
         queue = [start]
         path = [start]
+        visited_local = set([start])
 
         while queue:
             current = queue.pop(0)
-            if current in visited and current != start:
+            print(f'current; {current}')
+            if current != start and (current in visited_junctions or current in set(map(tuple, endpoints))):
                 # Found a junction or another endpoint, add the edge
                 G.add_edge(start, current, path=path.copy())
                 break
-            visited.add(current)
+            visited_local.add(current)
             neighbors = get_neighbors(current)
 
             for neighbor in neighbors:
-                if neighbor not in visited:
+                if neighbor not in visited_local:
                     queue.append(neighbor)
                     path.append(neighbor)
 
     return G
 
 
-def segment_lookup_table(graph, skel):
+def segment_lookup_table(graph):
     lookup = {}
     for edge in graph.edges:
         # Retrieve all pixels in this segment
-        segment_pixels = get_segment_pixels(edge, graph, skel)
+        segment_pixels = get_segment_pixels(edge, graph)
 
         # Map each pixel to the corresponding segment
         for pixel in segment_pixels:
@@ -260,9 +265,23 @@ def get_segment_pixels(segment, graph):
 
 
 def find_path_bis(x, y, graph, lookup_table):
-    pixel = [x,y]
+    pixel = (x,y)
     segment = lookup_table.get(pixel, None)
 
     path = get_segment_pixels(segment, graph)
 
     return path
+
+def visualize_graph(graph, skel):
+    # Create a plot
+    plt.figure(figsize=(12, 12))
+
+    # Draw the skeleton image as the background
+    plt.imshow(skel, cmap='gray')
+
+    # Draw the graph
+    pos = {node: (node[1], node[0]) for node in graph.nodes()}  # Adjust position for correct orientation
+    nx.draw(graph, pos, node_size=50, node_color='red', edge_color='blue', with_labels=True)
+
+    # Show the plot
+    plt.show()
