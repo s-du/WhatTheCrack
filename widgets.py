@@ -415,7 +415,11 @@ class PhotoViewer(QGraphicsView):
         # Create a QPixmap with a transparent background
         self.cursor_diameter = diameter
 
-        pixmap = QPixmap(diameter, diameter)
+        scale_factor = self.transform().m11()
+        print(f'scale factor: {scale_factor}')
+        scaledDiameter = diameter * scale_factor
+
+        pixmap = QPixmap(scaledDiameter, scaledDiameter)
         pixmap.fill(Qt.transparent)
 
         # Create a QPainter to draw on the pixmap
@@ -424,7 +428,7 @@ class PhotoViewer(QGraphicsView):
 
         # Draw a circle
         painter.setPen(QColor(0, 0, 0))  # Black color, you can change as needed
-        painter.drawEllipse(0, 0, diameter - 1, diameter - 1)
+        painter.drawEllipse(0, 0, scaledDiameter - 1, scaledDiameter - 1)
 
         # End painting
         painter.end()
@@ -669,10 +673,12 @@ class PhotoViewer(QGraphicsView):
 
                 else:
                     factor = 0.8
+
                     self.prefered_cursor_diam *= factor
                     self.cursor_diameter *= factor
                     cursor = self.create_circle_cursor(self.cursor_diameter)
                     self.setCursor(cursor)
+
 
                     self.brush.setWidth(self.prefered_cursor_diam)
                     self.eraser_brush.setWidth(self.prefered_cursor_diam)
@@ -698,13 +704,9 @@ class PhotoViewer(QGraphicsView):
 
             # adapt paint cursor
             if self.painting:
-                if self._zoom > 0:
-                    self.cursor_diameter *= factor
-                    cursor = self.create_circle_cursor(self.cursor_diameter)
-                    self.setCursor(cursor)
-                else:
                     cursor = self.create_circle_cursor(self.prefered_cursor_diam)
                     self.setCursor(cursor)
+
 
             self.viewport().update()
             self.update_font_and_line_size()
