@@ -9,6 +9,8 @@ import numpy as np
 import os
 import resources as res
 import cv2
+import networkx as nx
+
 
 model_path = res.find('other/best.pt')
 
@@ -190,3 +192,77 @@ def remove_mask_from_paint(img, coords):
     img[coords[:, 0], coords[:, 1]] = 0
 
     return img
+
+
+# NEW METHOD FOR SKELETON GRAPH
+def build_graph(junctions, endpoints, skel):
+    G = nx.Graph()
+
+    # Add junctions and endpoints as nodes
+    for point in np.vstack([junctions, endpoints]):
+        G.add_node(tuple(point))
+
+    # Helper function to get neighbors
+    def get_neighbors(pos):
+        y, x = pos
+        neighbors = [
+            (y - 1, x), (y + 1, x), (y, x - 1), (y, x + 1),
+            (y - 1, x - 1), (y - 1, x + 1), (y + 1, x - 1), (y + 1, x + 1)
+        ]
+        return [n for n in neighbors if skel[n] == 255]
+
+    # Mark all junctions and endpoints as visited initially
+    visited = set(tuple(p) for p in np.vstack([junctions, endpoints]))
+
+    for endpoint in endpoints:
+        start = tuple(endpoint)
+        queue = [start]
+        path = [start]
+
+        while queue:
+            current = queue.pop(0)
+            if current in visited and current != start:
+                # Found a junction or another endpoint, add the edge
+                G.add_edge(start, current, path=path.copy())
+                break
+            visited.add(current)
+            neighbors = get_neighbors(current)
+
+            for neighbor in neighbors:
+                if neighbor not in visited:
+                    queue.append(neighbor)
+                    path.append(neighbor)
+
+    return G
+
+
+def segment_lookup_table(graph, skel):
+    lookup = {}
+    for edge in graph.edges:
+        # Retrieve all pixels in this segment
+        segment_pixels = get_segment_pixels(edge, graph, skel)
+
+        # Map each pixel to the corresponding segment
+        for pixel in segment_pixels:
+            lookup[tuple(pixel)] = edge
+
+    return lookup
+
+def get_segment_pixels(segment, graph):
+    # Extract the start and end points from the segment
+    start, end = segment
+
+    # Retrieve the path from the graph
+    path = graph.edges[start, end]['path']
+
+    # If the path is directly stored in the edge attribute
+    return path
+
+
+def find_path_bis(x, y, graph, lookup_table):
+    pixel = [x,y]
+    segment = lookup_table.get(pixel, None)
+
+    path = get_segment_pixels(segment, graph)
+
+    return path
