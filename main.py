@@ -405,7 +405,7 @@ class CrackApp(QMainWindow):
         self.graph = seg.build_graph(self.junctions, self.endpoints, skel)
         self.lookup_table = seg.segment_lookup_table(self.graph)
 
-        # seg.visualize_graph(self.graph, skel)
+        seg.visualize_graph(self.graph, skel)
 
     def go_segment(self):
         # execute YOLO script

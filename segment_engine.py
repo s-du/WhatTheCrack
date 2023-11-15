@@ -213,6 +213,54 @@ def build_graph(junctions, endpoints, skel):
         ]
         return [n for n in neighbors if skel[n] == 255]
 
+    # Function to run BFS and add edges
+    def add_edges_from_node(start):
+        queue = [(start, [start])]
+        visited_local = set()
+
+        while queue:
+            current, path = queue.pop(0)
+
+            if current != start and current in all_nodes:
+                edge = (start, current)
+                # Check if the edge already exists to avoid duplicates
+                if not G.has_edge(*edge):
+                    G.add_edge(*edge, path=path)
+                continue
+
+            visited_local.add(current)
+            neighbors = get_neighbors(current)
+
+            for neighbor in neighbors:
+                if neighbor not in visited_local:
+                    new_path = path + [neighbor]
+                    queue.append((neighbor, new_path))
+
+    # Combine junctions and endpoints
+    all_nodes = set(tuple(p) for p in np.vstack([junctions, endpoints]))
+
+    # Run BFS from each junction and endpoint
+    for node in all_nodes:
+        add_edges_from_node(node)
+
+    return G
+
+def build_graph_old(junctions, endpoints, skel):
+    G = nx.Graph()
+
+    # Add junctions and endpoints as nodes
+    for point in np.vstack([junctions, endpoints]):
+        G.add_node(tuple(point))
+
+    # Helper function to get neighbors
+    def get_neighbors(pos):
+        y, x = pos
+        neighbors = [
+            (y - 1, x), (y + 1, x), (y, x - 1), (y, x + 1),
+            (y - 1, x - 1), (y - 1, x + 1), (y + 1, x - 1), (y + 1, x + 1)
+        ]
+        return [n for n in neighbors if skel[n] == 255]
+
     # Mark all junctions as visited initially
     visited_junctions = set(tuple(p) for p in junctions)
 
