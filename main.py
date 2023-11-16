@@ -15,6 +15,7 @@ OUT_COLOR_MASK = 'combined_color_mask.png'
 OUT_BINARY_SKELETON = 'skeleton_image.png'
 OUT_COLOR_SKELETON = 'skeleton_color.png'
 
+
 class CustomDoubleValidator(QDoubleValidator):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -150,6 +151,9 @@ class CrackApp(QMainWindow):
         self.output_skeleton = OUT_BINARY_SKELETON
         self.output_color_skeleton = OUT_COLOR_SKELETON
 
+        # initialize status
+        self.update_progress(nb=100, text="Load an image first!")
+
         # list of line measurements
         self.line_meas_list = []
 
@@ -198,19 +202,23 @@ class CrackApp(QMainWindow):
         self.add_icon(res.find(f'img/view{suf2}.png'), self.pushButton_export_view)
         self.add_icon(res.find(f'img/width{suf2}.png'), self.pushButton_show_linemeas)
 
+    # general functions __________________________________________
     def add_icon(self, img_source, pushButton_object):
         """
         Function to add an icon to a pushButton
         """
         pushButton_object.setIcon(QIcon(img_source))
 
-    def set_scale(self):
-        dialog = ScaleDialog()
-        if dialog.exec_():
-            self.resolution = dialog.resolution
-            print(f'New resolution is {self.resolution} mm/pixel')
-            self.viewer.mm_per_pixel = self.resolution
+    def update_progress(self, nb=None, text=''):
+        self.label_status.setText(text)
+        if nb is not None:
+            self.progressBar.setProperty("value", nb)
 
+            # hide progress bar when 100%
+            if nb >= 100:
+                self.progressBar.setVisible(False)
+            elif self.progressBar.isHidden():
+                self.progressBar.setVisible(True)
 
     # paint and erase __________________________________________
     def paint_mask(self):
@@ -268,7 +276,6 @@ class CrackApp(QMainWindow):
 
                 self.has_mask = True
                 self.update_view()
-
 
     def erase_mask(self):
         self.pushButton_show_mask.setChecked(True)
@@ -346,6 +353,7 @@ class CrackApp(QMainWindow):
         if not self.viewer.hand_drag:
             self.viewer.toggleDragMode()
 
+    # viewer __________________________________________
     def update_view(self):
         if self.pushButton_show_image.isChecked():
             if self.pushButton_show_mask.isChecked():
@@ -384,7 +392,6 @@ class CrackApp(QMainWindow):
                 self.viewer.clean_scene()
                 self.viewer.setPhoto(white_pixmap)
 
-
     def compute_all_outputs_from_binary(self, binary):
         color_mask = seg.binary_to_color_mask(binary)
         skel = seg.binary_to_skeleton(binary)
@@ -407,6 +414,14 @@ class CrackApp(QMainWindow):
 
         seg.visualize_graph(self.graph, skel)
 
+    # other scientific functions __________________________________________
+    def set_scale(self):
+        dialog = ScaleDialog()
+        if dialog.exec_():
+            self.resolution = dialog.resolution
+            print(f'New resolution is {self.resolution} mm/pixel')
+            self.viewer.mm_per_pixel = self.resolution
+
     def go_segment(self):
         # execute YOLO script
         self.hand_pan()
@@ -426,7 +441,6 @@ class CrackApp(QMainWindow):
         self.update_view()
 
     # load data __________________________________________
-
     def get_image(self):
         """
         Get the image path from the user
@@ -557,6 +571,20 @@ def main(argv=None):
                 background-color: #666;
             }
             QWidget { background-color: #444; }
+            QProgressBar {
+                text-align: center;
+                color: rgb(240, 240, 240);
+                border-width: 1px; 
+                border-radius: 10px;
+                border-color: rgb(230, 230, 230);
+                border-style: solid;
+                background-color:rgb(207,207,207);
+            }
+                
+            QProgressBar:chunk {
+                background-color:rgb(50, 156, 179);
+                border-radius: 10px;
+            }
             """)
 
     # create the main window
