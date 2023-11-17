@@ -6,6 +6,7 @@ from PySide6.QtWidgets import *
 from PySide6.QtUiTools import QUiLoader
 import resources as res
 
+
 class UiLoader(QUiLoader):
     """
     Subclass :class:`~PySide.QtUiTools.QUiLoader` to create the user interface
@@ -163,6 +164,21 @@ def QPixmapToArray(pixmap):
 
     return img
 
+class CircularPixmapItem(QGraphicsRectItem):
+    def __init__(self, pixmap, size, parent=None):
+        super().__init__(-size / 2, -size / 2, size, size, parent)
+        self.pixmap = pixmap
+        self.size = size
+
+    def paint(self, painter, option, widget=None):
+        painter.setRenderHint(QPainter.Antialiasing)
+        path = QPainterPath()
+        path.addEllipse(self.rect())
+        painter.setClipPath(path)
+
+        # Correct the drawPixmap call
+        targetRect = self.rect().toRect()  # Convert QRectF to QRect
+        painter.drawPixmap(targetRect, self.pixmap, self.pixmap.rect())
 
 class MagnifyingGlass(QGraphicsEllipseItem):
     def __init__(self, size=200, parent=None):
@@ -171,34 +187,28 @@ class MagnifyingGlass(QGraphicsEllipseItem):
         self.setBrush(Qt.transparent)
         self.pen = QPen()
         self.pen.setStyle(Qt.DashDotLine)
-        self.pen.setWidth(4)
-        self.pen.setColor(QColor(255, 0, 0, a=255))
+        self.pen.setWidth(5)
+        self.pen.setColor(QColor(120, 120, 120, a=200))
 
-        self.setPen(Qt.NoPen)
+        self.setPen(self.pen)
         self.pixmap_item = QGraphicsPixmapItem(self)
         self.pixmap_item.setPos(-self._size / 2, -self._size / 2)
         self.setZValue(1)
 
-    def update_size(self):
-        self.pixmap_item.setPos(-self._size / 2, -self._size / 2)
+    def update_size(self, new_size):
+        self._size = new_size
+
+        # Update the ellipse size
+        self.setRect(-self._size / 2, -self._size / 2, self._size, self._size)
 
     def set_pixmap(self, pixmap):
-        # Create an elliptical mask for the pixmap
-        mask_image = QImage(pixmap.size(), QImage.Format_Alpha8)
-        mask_image.fill(Qt.transparent)
+        # Remove the old pixmap item if it exists
+        if hasattr(self, 'pixmap_item'):
+            self.scene().removeItem(self.pixmap_item)
 
-        painter = QPainter(mask_image)
-        painter.setBrush(Qt.white)
-        painter.drawEllipse(mask_image.rect())
-        painter.end()
-
-        # Convert QImage to QBitmap for PySide6
-        mask_bitmap = QBitmap.fromImage(mask_image)
-
-        pixmap.setMask(mask_bitmap)
-
-        # Set the masked pixmap to the pixmap item
-        self.pixmap_item.setPixmap(pixmap)
+        # Create and add the new circular pixmap item
+        self.pixmap_item = CircularPixmapItem(pixmap, self._size, self)
+        self.pixmap_item.setPos(0, 0)
 
 
 class PhotoViewer(QGraphicsView):
@@ -290,6 +300,7 @@ class PhotoViewer(QGraphicsView):
         self.middle_mouse_pressed = False
 
         self.magnifying_glass_size = 400  # Adjust this value to change the size
+        self.magnifying_factor = 4
         self.magnifying_glass = MagnifyingGlass(self.magnifying_glass_size)
         self._scene.addItem(self.magnifying_glass)
         # Temporarily hide the magnifying glass to avoid rendering it
@@ -396,6 +407,7 @@ class PhotoViewer(QGraphicsView):
             print(type(item))
             if isinstance(item, QGraphicsTextItem):
                 self._scene.removeItem(item)
+
     def clean_scene_path(self):
         for item in self._scene.items():
             print(type(item))
@@ -479,9 +491,8 @@ class PhotoViewer(QGraphicsView):
             self.text_font_size = int(self.scene().width() / 160)
 
             # intial line size
-            self.line_size = int(self.text_font_size/ 4)
+            self.line_size = int(self.text_font_size / 4)
             self.pen_yolo.setWidth(self.line_size)
-
 
             if fit_view:
                 self.fitInView()
@@ -616,7 +627,6 @@ class PhotoViewer(QGraphicsView):
                 self.pen_yolo.setWidth(self.line_size)
                 item.setPen(self.pen_yolo)
 
-
     def update_font_and_line_size(self):
         # Adjust font size based on the zoom level
         if self._zoom >= 0:
@@ -625,17 +635,16 @@ class PhotoViewer(QGraphicsView):
             scale_factor = 1 + abs(self._zoom) * 0.2  # Adjust scaling factor for zoom out
 
         self.text_font_size = int(self.original_text_font_size * scale_factor)
-        self.line_size = int(self.text_font_size/4)
+        self.line_size = int(self.text_font_size / 4)
 
         self.update_all_text_size()  # Function to update the text size in your view
         self.update_all_line_size()
-
 
     def update_magnifier_wheel(self, event):
         scene_pos = self.mapToScene(event.position().toPoint())
 
         # Adjust these values for desired magnification
-        magnify_factor = 4
+        magnify_factor = self.magnifying_factor
 
         # Calculate the dimensions of the sub-pixmap to grab
         grab_width = self.magnifying_glass_size // magnify_factor
@@ -655,24 +664,34 @@ class PhotoViewer(QGraphicsView):
 
         # Update the magnifying glass
         self.magnifying_glass.setPos(scene_pos)
+        self.magnifying_glass.update_size(self.magnifying_glass_size)
         self.magnifying_glass.set_pixmap(magnified_pixmap)
+
 
     # mouse events
     def wheelEvent(self, event):
-        if event.modifiers() & Qt.ControlModifier:
-            if event.angleDelta().y() > 0:
-                factor = 1.25
-                self.magnifying_glass_size *= factor
-                self.magnifying_glass._size = self.magnifying_glass_size
-                self.magnifying_glass.update_size()
-                self.update_magnifier_wheel(event)
+        if self.right_mouse_pressed:
+            if event.modifiers() & Qt.ControlModifier:
+                if event.angleDelta().y() > 0:
+                    factor = 1.25
+                    self.magnifying_glass_size *= factor
+                    self.update_magnifier_wheel(event)
 
-            else:
-                factor = 0.8
-                self.magnifying_glass_size *= factor
-                self.magnifying_glass._size = self.magnifying_glass_size
-                self.magnifying_glass.update_size()
-                self.update_magnifier_wheel(event)
+                else:
+                    factor = 0.8
+                    self.magnifying_glass_size *= factor
+                    self.update_magnifier_wheel(event)
+
+            elif event.modifiers() & Qt.ShiftModifier:
+                if event.angleDelta().y() > 0:
+                    factor = 1.25
+                    self.magnifying_factor *= factor
+                    self.update_magnifier_wheel(event)
+
+                else:
+                    factor = 0.8
+                    self.magnifying_factor *= factor
+                    self.update_magnifier_wheel(event)
 
         elif event.modifiers() & Qt.ShiftModifier:
             if self.painting or self.point_selection:
@@ -764,7 +783,6 @@ class PhotoViewer(QGraphicsView):
                 self._scene.addItem(self._current_path_item)
 
         elif event.button() == Qt.RightButton:
-
             if self.has_photo():
                 self.right_mouse_pressed = True
                 print('right click!')
@@ -786,7 +804,7 @@ class PhotoViewer(QGraphicsView):
             scene_pos = self.mapToScene(event.pos())
 
             # Adjust these values for desired magnification
-            magnify_factor = 4
+            magnify_factor = self.magnifying_factor
 
             # Calculate the dimensions of the sub-pixmap to grab
             grab_width = self.magnifying_glass_size // magnify_factor
@@ -807,6 +825,7 @@ class PhotoViewer(QGraphicsView):
             # Update the magnifying glass
             self.magnifying_glass.setPos(scene_pos)
             self.magnifying_glass.set_pixmap(magnified_pixmap)
+            self.magnifying_glass.setZValue(2)
             self.magnifying_glass.show()
 
         elif self.line_meas:
