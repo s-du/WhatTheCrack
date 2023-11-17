@@ -4,8 +4,6 @@ from PySide6.QtCore import *
 from PySide6.QtGui import *
 from PySide6.QtWidgets import *
 from PySide6.QtUiTools import QUiLoader
-import resources as res
-
 
 class UiLoader(QUiLoader):
     """
@@ -328,6 +326,13 @@ class PhotoViewer(QGraphicsView):
         for path in path_data:
             self._scene.addItem(path[0])  # line item
             self._scene.addItem(path[1])  # text item
+
+            if self.mm_per_pixel is not None:
+                text_content = path[1].toPlainText()
+                numeric_part = text_content.split()[0]
+                distance = float(numeric_part)
+                path[1].setPlainText(
+                    f'{distance:.2f} pixels \n {distance * self.mm_per_pixel:.2f} mm')
 
     def draw_scale_bar(self, painter):
         current_scale_factor = self.transform().m11()

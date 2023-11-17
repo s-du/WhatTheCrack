@@ -7,7 +7,6 @@ from PySide6.QtWidgets import *
 from PySide6.QtCore import Signal, QObject
 import resources as res
 import segment_engine as seg
-import sys
 import widgets as wid
 import re
 

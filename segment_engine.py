@@ -4,8 +4,6 @@ import networkx as nx
 import numpy as np
 from scipy.ndimage import convolve
 from skimage.morphology import skeletonize
-import sys
-from PySide6.QtCore import Signal, QRunnable, QObject, QProcess, QThread
 
 # custom modules
 import resources as res
