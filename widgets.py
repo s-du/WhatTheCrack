@@ -641,9 +641,9 @@ class PhotoViewer(QGraphicsView):
     def update_font_and_line_size(self):
         # Adjust font size based on the zoom level
         if self._zoom >= 0:
-            scale_factor = 1 / (1 + 0.25 * self._zoom)  # Adjust scaling factor as needed
+            scale_factor = 1 / (1 + 0.3 * (1.2 ** self._zoom))  # Adjust scaling factor as needed
         else:
-            scale_factor = 1 + abs(self._zoom) * 0.2  # Adjust scaling factor for zoom out
+            scale_factor = 1
 
         self.text_font_size = int(self.original_text_font_size * scale_factor)
         self.line_size = int(self.text_font_size / 4)
