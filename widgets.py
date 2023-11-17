@@ -164,6 +164,7 @@ def QPixmapToArray(pixmap):
 
     return img
 
+
 class CircularPixmapItem(QGraphicsRectItem):
     def __init__(self, pixmap, size, parent=None):
         super().__init__(-size / 2, -size / 2, size, size, parent)
@@ -180,15 +181,16 @@ class CircularPixmapItem(QGraphicsRectItem):
         targetRect = self.rect().toRect()  # Convert QRectF to QRect
         painter.drawPixmap(targetRect, self.pixmap, self.pixmap.rect())
 
+
 class MagnifyingGlass(QGraphicsEllipseItem):
-    def __init__(self, size=200, parent=None):
+    def __init__(self, size=200, border_width=5, parent=None):
         self._size = size
         super().__init__(-self._size / 2, -self._size / 2, self._size, self._size, parent)
         self.setBrush(Qt.transparent)
         self.pen = QPen()
         self.pen.setStyle(Qt.DashDotLine)
-        self.pen.setWidth(5)
-        self.pen.setColor(QColor(120, 120, 120, a=200))
+        self.pen.setWidth(border_width)
+        self.pen.setColor(QColor(255, 255, 255, a=200))
 
         self.setPen(self.pen)
         self.pixmap_item = QGraphicsPixmapItem(self)
@@ -301,13 +303,14 @@ class PhotoViewer(QGraphicsView):
 
         self.magnifying_glass_size = 400  # Adjust this value to change the size
         self.magnifying_factor = 4
-        self.magnifying_glass = MagnifyingGlass(self.magnifying_glass_size)
-        self._scene.addItem(self.magnifying_glass)
-        # Temporarily hide the magnifying glass to avoid rendering it
-        self.magnifying_glass.hide()
+        self.magnifying_glass = None
 
     def has_photo(self):
         return not self._empty
+
+    def drawBackground(self, painter, rect):
+        # Fill the background with black color
+        painter.fillRect(rect, QColor(0, 0, 0))  # RGB values for black
 
     def add_all_line_measurements(self, line_data, path_data=None):
         for line in line_data:
@@ -494,6 +497,14 @@ class PhotoViewer(QGraphicsView):
             self.line_size = int(self.text_font_size / 4)
             self.pen_yolo.setWidth(self.line_size)
 
+            # adapt magnifier border
+            self.magnifying_glass_size = int(self.scene().width() / 10)
+            self.magnifying_glass = MagnifyingGlass(self.magnifying_glass_size, border_width=self.line_size*3)
+            self._scene.addItem(self.magnifying_glass)
+            # Temporarily hide the magnifying glass to avoid rendering it
+            self.magnifying_glass.hide()
+
+
             if fit_view:
                 self.fitInView()
 
@@ -666,7 +677,6 @@ class PhotoViewer(QGraphicsView):
         self.magnifying_glass.setPos(scene_pos)
         self.magnifying_glass.update_size(self.magnifying_glass_size)
         self.magnifying_glass.set_pixmap(magnified_pixmap)
-
 
     # mouse events
     def wheelEvent(self, event):

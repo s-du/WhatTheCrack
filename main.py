@@ -432,7 +432,7 @@ class CrackApp(QMainWindow):
 
                 # Create a new white image of the same size
                 white_image = QImage(original_image.size(), QImage.Format_ARGB32)
-                white_image.fill(Qt.white)  # Fill the image with white color
+                white_image.fill(Qt.black)  # Fill the image with white color
 
                 # Convert the white QImage to QPixmap
                 white_pixmap = QPixmap.fromImage(white_image)
