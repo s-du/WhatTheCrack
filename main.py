@@ -1,12 +1,16 @@
+import cv2
+import numpy as np
 import os
+from PIL import Image
 from PySide6.QtGui import *
 from PySide6.QtWidgets import *
-import widgets as wid
+from PySide6.QtCore import Signal, QObject
 import resources as res
 import segment_engine as seg
-import cv2
-from PIL import Image
-import numpy as np
+import sys
+import widgets as wid
+import re
+
 
 # parameters
 # path (change if necessary)
@@ -15,6 +19,27 @@ OUT_COLOR_MASK = 'combined_color_mask.png'
 OUT_BINARY_SKELETON = 'skeleton_image.png'
 OUT_COLOR_SKELETON = 'skeleton_color.png'
 
+
+"""
+class CustomOutputStream(QObject):
+    outputSignal = Signal(str)
+
+    def write(self, text):
+        if "step" in text:
+            self.outputSignal.emit('read')
+        else:
+            self.outputSignal.emit(text)
+
+    def flush(self):
+        pass
+
+sys.stdout = CustomOutputStream()
+"""
+class Helper(QObject):
+    updateSignal = Signal(str)
+
+    def emit_update(self, value):
+        self.updateSignal.emit(value)
 
 class CustomDoubleValidator(QDoubleValidator):
     def __init__(self, *args, **kwargs):
@@ -180,6 +205,12 @@ class CrackApp(QMainWindow):
         self.viewer.endPainting.connect(self.update_image_mask)
         self.viewer.photoClicked.connect(self.get_path)
 
+        # Custom output stream
+        # sys.stdout.outputSignal.connect(self.onOutput)
+
+        self.helper = Helper()
+        self.helper.updateSignal.connect(self.update_yolo_steps)
+
         if is_dark_theme:
             suf = '_white_tint'
             suf2 = '_white'
@@ -227,9 +258,10 @@ class CrackApp(QMainWindow):
         self.update_view()
 
         if self.actionPaint_mask.isChecked():
+            # update status
+            self.update_progress(text='You can paint on the image. Hold shift and mouse wheel to adapt size')
             # change cursor
-            circle_cursor = self.viewer.create_circle_cursor(30)  # 30 pixels in diameter
-            self.viewer.setCursor(circle_cursor)
+            self.viewer.change_to_brush_cursor()
             self.viewer.painting = True
             self.viewer.eraser = False
             self.viewer.point_selection = False
@@ -283,9 +315,10 @@ class CrackApp(QMainWindow):
         self.update_view()
 
         if self.actionEraser_mask.isChecked():
+            # update status
+            self.update_progress(text='You can remove paint on the image. Hold shift and mouse wheel to adapt size')
             # change cursor
-            circle_cursor = self.viewer.create_circle_cursor(30)  # 30 pixels in diameter
-            self.viewer.setCursor(circle_cursor)
+            self.viewer.change_to_brush_cursor()
             self.viewer.painting = True
             self.viewer.eraser = True
             self.viewer.point_selection = False
@@ -297,6 +330,7 @@ class CrackApp(QMainWindow):
     def toggle_line_meas(self):
         if self.pushButton_show_linemeas.isChecked():
             self.viewer.add_all_line_measurements(self.line_meas_list)
+            self.update_progress(text='Click and drag the measure a distance')
         else:
             self.viewer.clean_scene_line()
             self.viewer.clean_scene_text()
@@ -321,12 +355,13 @@ class CrackApp(QMainWindow):
     # path measurement __________________________________________
     def path_meas(self):
         if self.actionMeasure_path.isChecked():
+            # update status
+            self.update_progress(text='You can click on a crack segment to measure it')
             self.viewer.point_selection = True
             self.viewer.painting = False
 
             # change cursor
-            circle_cursor = self.viewer.create_circle_cursor(30)  # 30 pixels in diameter
-            self.viewer.setCursor(circle_cursor)
+            self.viewer.change_to_brush_cursor()
             if self.viewer.hand_drag:
                 self.viewer.toggleDragMode()
 
@@ -344,6 +379,8 @@ class CrackApp(QMainWindow):
             self.viewer.add_path_to_scene(path)
 
     def hand_pan(self):
+        # update status
+        self.update_progress(text='You can drag/pan the image')
         # switch back to hand tool
         self.viewer.point_selection = False
         self.viewer.line_meas = False
@@ -412,7 +449,7 @@ class CrackApp(QMainWindow):
         self.graph = seg.build_graph(self.junctions, self.endpoints, skel)
         self.lookup_table = seg.segment_lookup_table(self.graph)
 
-        seg.visualize_graph(self.graph, skel)
+        # seg.visualize_graph(self.graph, skel)
 
     # other scientific functions __________________________________________
     def set_scale(self):
@@ -426,11 +463,15 @@ class CrackApp(QMainWindow):
         # execute YOLO script
         self.hand_pan()
 
-        result = seg.get_segmentation_result(self.image_path)
+        self.update_progress(text="Segmenting image with yolo!", nb=0)
+
+        result = seg.get_segmentation_result(self.helper, self.image_path)
         binary = seg.create_binary_from_yolo(result)
 
         self.compute_all_outputs_from_binary(binary)
         self.has_mask = True
+
+        self.update_progress(text="You can now modify the mask!", nb=100)
 
         self.pushButton_show_mask.setEnabled(True)
         self.pushButton_show_skel.setEnabled(True)
@@ -439,6 +480,28 @@ class CrackApp(QMainWindow):
         self.actionMeasure_path.setEnabled(True)
 
         self.update_view()
+
+    def update_yolo_steps(self, text):
+        def extract_numbers(input_string):
+            # This regex pattern looks for two groups of one or more digits,
+            # separated by a non-digit character (like '/')
+            match = re.search(r'(\d+)[^\d]+(\d+)', input_string)
+            if match:
+                first_number = int(match.group(1))
+                second_number = int(match.group(2))
+                return first_number, second_number
+            else:
+                return None, None
+
+        i, num_slices = extract_numbers(text)
+        print(i, num_slices)
+        self.update_progress(text=f'Segmenting slice {i}/{num_slices}', nb=i/num_slices*100)
+    def onOutput(self, text):
+        if text == 'read':
+            # Handle 'read' emission here
+            self.update_progress(text=text)
+        else:
+            pass
 
     # load data __________________________________________
     def get_image(self):

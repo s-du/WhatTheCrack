@@ -5,6 +5,7 @@ import logging
 import os
 import time
 from typing import List, Optional
+from PySide6.QtCore import Signal
 
 from sahi.utils.import_utils import is_available
 
@@ -123,6 +124,7 @@ def get_prediction(
 
 
 def get_sliced_prediction(
+    helper,
     image,
     detection_model=None,
     slice_height: int = None,
@@ -188,6 +190,7 @@ def get_sliced_prediction(
             object_prediction_list: a list of sahi.prediction.ObjectPrediction
             durations_in_seconds: a dict containing elapsed times for profiling
     """
+    outputSignal = Signal(str)
 
     # for profiling
     durations_in_seconds = dict()
@@ -230,7 +233,9 @@ def get_sliced_prediction(
         tqdm.write(f"Performing prediction on {num_slices} number of slices.")
     object_prediction_list = []
     # perform sliced prediction
-    for group_ind in range(num_group):
+    for i, group_ind in enumerate(range(num_group)):
+        helper.emit_update(f'step: {i}/{num_slices}')
+
         # prepare batch (currently supports only 1 batch)
         image_list = []
         shift_amount_list = []

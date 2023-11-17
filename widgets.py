@@ -280,14 +280,9 @@ class PhotoViewer(QGraphicsView):
         self.text_font_size = 0
         self.line_size = 0
 
-        # custom cursor
-        # define custom cursor (if needed)
-        cur_img = res.find('img/circle.png')
-        self.cur_pixmap = QPixmap(cur_img)
-        pixmap_scaled = self.cur_pixmap.scaledToWidth(12)
-        self.brush_cur = QCursor(pixmap_scaled)
-
-        self.prefered_cursor_diam = 30
+        # custom paint cursor
+        self.prefered_cursor_diam = None
+        self.brush_cur = None
 
         # magnifying glass
         self.right_mouse_pressed = False
@@ -302,7 +297,7 @@ class PhotoViewer(QGraphicsView):
     def has_photo(self):
         return not self._empty
 
-    def add_all_line_measurements(self, line_data):
+    def add_all_line_measurements(self, line_data, path_data=None):
         for line in line_data:
             self._scene.addItem(line[0])  # line item
             self._scene.addItem(line[1])  # text item
@@ -348,7 +343,6 @@ class PhotoViewer(QGraphicsView):
 
     def fitInView(self, scale=True):
         rect = QRectF(self._photo.pixmap().rect())
-        print(rect)
         if not rect.isNull():
             self.setSceneRect(rect)
             if self.has_photo():
@@ -470,8 +464,14 @@ class PhotoViewer(QGraphicsView):
             self.line_size = int(self.text_font_size/ 4)
             self.pen_yolo.setWidth(self.line_size)
 
+
             if fit_view:
                 self.fitInView()
+
+                # initial cursor size
+                self.prefered_cursor_diam = int(self.scene().width() / 75)
+                print(f'initial brush diam: {self.prefered_cursor_diam}')
+                self.brush_cur = self.create_circle_cursor(self.prefered_cursor_diam)
 
         else:
             self._empty = True
@@ -657,15 +657,15 @@ class PhotoViewer(QGraphicsView):
                 self.update_magnifier_wheel(event)
 
         elif event.modifiers() & Qt.ShiftModifier:
-            if self.painting:
+            if self.painting or self.point_selection:
                 if event.angleDelta().y() > 0:
                     factor = 1.25
                     self.prefered_cursor_diam *= factor
                     self.cursor_diameter *= factor
-                    cursor = self.create_circle_cursor(self.cursor_diameter)
-                    self.setCursor(cursor)
+                    self.brush_cur = self.create_circle_cursor(self.cursor_diameter)
+                    self.change_to_brush_cursor()
 
-                    # adapt brush:
+                    # adapt brush drawing size:
                     print(self.prefered_cursor_diam)
                     self.brush.setWidth(self.prefered_cursor_diam)
                     self.eraser_brush.setWidth(self.prefered_cursor_diam)
@@ -676,10 +676,10 @@ class PhotoViewer(QGraphicsView):
 
                     self.prefered_cursor_diam *= factor
                     self.cursor_diameter *= factor
-                    cursor = self.create_circle_cursor(self.cursor_diameter)
-                    self.setCursor(cursor)
+                    self.brush_cur = self.create_circle_cursor(self.cursor_diameter)
+                    self.change_to_brush_cursor()
 
-
+                    # adapt brush drawing size:
                     self.brush.setWidth(self.prefered_cursor_diam)
                     self.eraser_brush.setWidth(self.prefered_cursor_diam)
 
@@ -703,10 +703,9 @@ class PhotoViewer(QGraphicsView):
                 self._zoom = 0
 
             # adapt paint cursor
-            if self.painting:
-                    cursor = self.create_circle_cursor(self.prefered_cursor_diam)
-                    self.setCursor(cursor)
-
+            if self.painting or self.point_selection:
+                self.brush_cur = self.create_circle_cursor(self.prefered_cursor_diam)
+                self.change_to_brush_cursor()
 
             self.viewport().update()
             self.update_font_and_line_size()
