@@ -23,7 +23,7 @@ The app offers the following key features:
 ## Files and Structure
 - `resources/`: Contains essential resources for the application.
 - `sahi/`: Modified SAHI module for image segmentation and analysis.
-- `crackify.ui`: The user interface file for the application.
+- `interface.ui`: The user interface file for the application.
 - `main.py`: The main Python script for running the application.
 - `segment_engine.py`: Handles the segmentation logic.
 - `widgets.py`: Defines Pyside6 widgets and UI components.
