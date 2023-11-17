@@ -3,9 +3,11 @@
 </p>
 
 ## Overview
-WhatTheCrack is a intuitive tool designed for detecting cracks in construction materials. This application leverages the capabilities of YOLO V8 and SAHI, providing users with an intuitive graphical interface for straightforward measurements&#8203;``【oaicite:3】``&#8203;.
+WhatTheCrack is a intuitive tool designed for detecting cracks in construction materials. This application leverages the capabilities of YOLO V8 and SAHI, providing users with an intuitive graphical interface for straightforward measurements.
 
 **The project is still in pre-release, so do not hesitate to send your recommendations or the bugs you encountered!**
+
+![](anim.gif) 
 
 ## Features
 The app offers the following key features:
