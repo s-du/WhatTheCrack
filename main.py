@@ -181,6 +181,7 @@ class CrackApp(QMainWindow):
 
         # list of line measurements
         self.line_meas_list = []
+        self.path_meas_list = []
 
         # connections
         self.actionLoad_image.triggered.connect(self.get_image)
@@ -196,7 +197,7 @@ class CrackApp(QMainWindow):
         self.pushButton_show_image.clicked.connect(self.update_view)
         self.pushButton_show_skel.clicked.connect(self.update_view)
         self.pushButton_show_mask.clicked.connect(self.update_view)
-        self.pushButton_show_linemeas.clicked.connect(self.toggle_line_meas)
+        self.pushButton_show_linemeas.clicked.connect(self.toggle_all_meas)
         self.pushButton_export.clicked.connect(self.export_view)
         self.pushButton_export_view.clicked.connect(self.export_current_view)
 
@@ -204,6 +205,7 @@ class CrackApp(QMainWindow):
         self.viewer.endDrawing_line_meas.connect(self.get_line_meas)
         self.viewer.endPainting.connect(self.update_image_mask)
         self.viewer.photoClicked.connect(self.get_path)
+        self.viewer.pathAdded.connect(self.get_path_measurements)
 
         # Custom output stream
         # sys.stdout.outputSignal.connect(self.onOutput)
@@ -327,16 +329,18 @@ class CrackApp(QMainWindow):
                 self.viewer.toggleDragMode()
 
     # line measurement __________________________________________
-    def toggle_line_meas(self):
+    def toggle_all_meas(self):
         if self.pushButton_show_linemeas.isChecked():
             self.viewer.add_all_line_measurements(self.line_meas_list)
-            self.update_progress(text='Click and drag the measure a distance')
+            self.viewer.add_all_path_measurements(self.path_meas_list)
         else:
             self.viewer.clean_scene_line()
             self.viewer.clean_scene_text()
+            self.viewer.clean_scene_path()
 
     def line_meas(self):
         if self.actionMeasure.isChecked():
+            self.update_progress(text='Click and drag the measure a distance')
             self.viewer.setCursor(Qt.ArrowCursor)
             # activate drawing tool
             self.point_selection = False
@@ -377,6 +381,12 @@ class CrackApp(QMainWindow):
 
             # highlighted_img = seg.highlight_path(img.shape, path)
             self.viewer.add_path_to_scene(path)
+
+    def get_path_measurements(self, path_obj, text_obj):
+        self.path_meas_list.append([path_obj, text_obj])
+
+        self.pushButton_show_linemeas.setEnabled(True)
+        self.pushButton_show_linemeas.setChecked(True)
 
     def hand_pan(self):
         # update status
@@ -458,6 +468,9 @@ class CrackApp(QMainWindow):
             self.resolution = dialog.resolution
             print(f'New resolution is {self.resolution} mm/pixel')
             self.viewer.mm_per_pixel = self.resolution
+
+            self.toggle_all_meas()
+            self.toggle_all_meas()
 
     def go_segment(self):
         # execute YOLO script

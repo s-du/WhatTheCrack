@@ -205,6 +205,7 @@ class PhotoViewer(QGraphicsView):
     photoClicked = Signal(list)
     endDrawing_rect = Signal()
     endDrawing_line_meas = Signal(QGraphicsLineItem, QGraphicsTextItem)
+    pathAdded = Signal(QGraphicsPathItem, QGraphicsTextItem)
     endPainting = Signal(np.ndarray)
     endErasing = Signal()
 
@@ -302,6 +303,18 @@ class PhotoViewer(QGraphicsView):
             self._scene.addItem(line[0])  # line item
             self._scene.addItem(line[1])  # text item
 
+            if self.mm_per_pixel is not None:
+                text_content = line[1].toPlainText()
+                numeric_part = text_content.split()[0]
+                distance = float(numeric_part)
+                line[1].setPlainText(
+                    f'{distance:.2f} pixels \n {distance * self.mm_per_pixel:.2f} mm')
+
+    def add_all_path_measurements(self, path_data):
+        for path in path_data:
+            self._scene.addItem(path[0])  # line item
+            self._scene.addItem(path[1])  # text item
+
     def draw_scale_bar(self, painter):
         current_scale_factor = self.transform().m11()
         length_in_pixels = self.scale_bar_length_mm / self.mm_per_pixel * current_scale_factor
@@ -382,6 +395,11 @@ class PhotoViewer(QGraphicsView):
         for item in self._scene.items():
             print(type(item))
             if isinstance(item, QGraphicsTextItem):
+                self._scene.removeItem(item)
+    def clean_scene_path(self):
+        for item in self._scene.items():
+            print(type(item))
+            if isinstance(item, QGraphicsPathItem):
                 self._scene.removeItem(item)
 
     def add_nodes(self, junctions, endpoints):
@@ -927,3 +945,5 @@ class PhotoViewer(QGraphicsView):
         font.setBold(True)  # Make the text bold
         text_item.setFont(font)
         self._scene.addItem(text_item)
+
+        self.pathAdded.emit(path_item, text_item)
