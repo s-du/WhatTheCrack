@@ -2,6 +2,7 @@ import cv2
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
+import os
 from scipy.ndimage import convolve
 from skimage.morphology import skeletonize
 
@@ -363,3 +364,82 @@ def visualize_graph(graph, skel):
 
     # Show the plot
     plt.show()
+
+
+def split_image(image_path, dest_folder, w_train, h_train, overlap, prefix='', save=True):
+    # Load the image
+    image = cv2.imread(image_path)
+    h, w = image.shape[:2]
+
+    # Calculate step size
+    step_w = int(w_train * (1 - overlap))
+    step_h = int(h_train * (1 - overlap))
+
+    # Initialize list to hold cropped images
+    cropped_images = []
+    names = []
+
+    # Iterate over the image
+    for y in range(0, h, step_h):
+        for x in range(0, w, step_w):
+            # Crop the image
+            crop = image[y:y+h_train, x:x+w_train]
+            cropped_images.append(crop)
+
+            name = f"{prefix}_crop_{x}_{y}.png"
+            path = os.path.join(dest_folder, name)
+            names.append(name)
+
+            if save:
+                # Optionally save each crop
+                cv2.imwrite(path, crop)
+
+    return cropped_images, names
+
+def convert_bin_mask_to_yolo_txt(mask_image, txt_dest_path, as_box=False, class_index=0):
+    if len(mask_image.shape) == 3:
+        mask_image = cv2.cvtColor(mask_image, cv2.COLOR_BGR2GRAY)
+
+    if mask_image.dtype != 'uint8':
+        mask_image = mask_image.astype('uint8')
+
+    # Find contours
+    contours, _ = cv2.findContours(mask_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    if not contours:
+        print("No contours found.")
+        return
+
+    # Image dimensions
+    image_height, image_width = mask_image.shape
+
+    # Open file to write annotations
+    with open(txt_dest_path, 'w') as file:
+        for contour in contours:
+            if as_box:
+                # Calculate bounding box
+                x, y, w, h = cv2.boundingRect(contour)
+
+                # Normalize coordinates
+                x_center = (x + w / 2) / image_width
+                y_center = (y + h / 2) / image_height
+                width = w / image_width
+                height = h / image_height
+
+                # Write YOLO annotation (assuming object class is 0)
+                file.write(f'0 {x_center} {y_center} {width} {height}\n')
+            else:
+                for contour in contours:
+                    # Start each row with the class index
+                    file.write(f"{class_index}")
+
+                    for point in contour.squeeze():
+                        x, y = point
+                        # Normalize coordinates
+                        x_normalized = x / image_width
+                        y_normalized = y / image_height
+                        # Write the normalized coordinates
+                        file.write(f" {x_normalized:.4f} {y_normalized:.4f}")
+
+                    # Newline after each contour
+                    file.write("\n")

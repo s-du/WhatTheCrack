@@ -4,12 +4,11 @@ import os
 from PIL import Image
 from PySide6.QtGui import *
 from PySide6.QtWidgets import *
-from PySide6.QtCore import Signal, QObject
+from PySide6.QtCore import Signal, QObject, Slot, Qt
 import resources as res
 import segment_engine as seg
 import widgets as wid
 import re
-
 
 # parameters
 # path (change if necessary)
@@ -17,7 +16,6 @@ OUT_BINARY_MASK = 'combined_binary_mask.png'
 OUT_COLOR_MASK = 'combined_color_mask.png'
 OUT_BINARY_SKELETON = 'skeleton_image.png'
 OUT_COLOR_SKELETON = 'skeleton_color.png'
-
 
 """
 class CustomOutputStream(QObject):
@@ -34,11 +32,14 @@ class CustomOutputStream(QObject):
 
 sys.stdout = CustomOutputStream()
 """
+
+
 class Helper(QObject):
     updateSignal = Signal(str)
 
     def emit_update(self, value):
         self.updateSignal.emit(value)
+
 
 class CustomDoubleValidator(QDoubleValidator):
     def __init__(self, *args, **kwargs):
@@ -68,6 +69,88 @@ class ExclusiveButtonGroup:
             if button != clicked_button:
                 button.setChecked(False)
 
+
+class ConfigDialog(QDialog):
+    def __init__(self):
+        super().__init__()
+
+        # Set dialog title
+        self.setWindowTitle("Export Options")
+
+        # Layout
+        layout = QVBoxLayout(self)
+
+        # Label and File path
+        layout.addWidget(QLabel("Choose output folder"))
+        self.file_path_edit = QLineEdit(self)
+        browse_button = QPushButton("Browse", self)
+        browse_button.clicked.connect(self.browse_folder)
+        file_path_layout = QHBoxLayout()
+        file_path_layout.addWidget(self.file_path_edit)
+        file_path_layout.addWidget(browse_button)
+        layout.addLayout(file_path_layout)
+
+        self.folder = ''
+
+        # prefix selection
+        self.prefix_edit = QLineEdit(self)
+        layout.addWidget(QLabel("Image prefix"))
+        layout.addWidget(self.prefix_edit)
+
+        # Split image checkbox
+        self.split_image_checkbox = QCheckBox("Split the image", self)
+        self.split_image_checkbox.stateChanged.connect(self.on_split_image_checked)
+        layout.addWidget(self.split_image_checkbox)
+
+
+        # Overlap factor
+        self.overlap_factor_edit = QLineEdit(self)
+        self.overlap_factor_edit.setValidator(QDoubleValidator(0, 1, 2, self))
+        self.overlap_factor_edit.setEnabled(False)
+        layout.addWidget(QLabel("Overlap factor"))
+        layout.addWidget(self.overlap_factor_edit)
+
+        # save mask checkbox
+        self.save_mask_check = QCheckBox("Save masks", self)
+        layout.addWidget(self.save_mask_check)
+
+        # Chosen width and height
+        self.width_edit = QLineEdit(self)
+        self.height_edit = QLineEdit(self)
+        self.width_edit.setValidator(QIntValidator(0, 2000, self))
+        self.height_edit.setValidator(QIntValidator(0, 2000, self))
+        layout.addWidget(QLabel("Chosen width"))
+        layout.addWidget(self.width_edit)
+        layout.addWidget(QLabel("Chosen height"))
+        layout.addWidget(self.height_edit)
+
+        # Annotation type combobox
+        self.annotation_combobox = QComboBox(self)
+        self.annotation_combobox.addItems(["Object detection annotation", "Instance segmentation annotation"])
+        layout.addWidget(self.annotation_combobox)
+
+        # OK and Cancel buttons
+        ok_button = QPushButton("OK", self)
+        cancel_button = QPushButton("Cancel", self)
+        ok_button.clicked.connect(self.accept)
+        cancel_button.clicked.connect(self.reject)
+        button_layout = QHBoxLayout()
+        button_layout.addWidget(ok_button)
+        button_layout.addWidget(cancel_button)
+        layout.addLayout(button_layout)
+
+    @Slot()
+    def browse_folder(self):
+        self.folder = QFileDialog.getExistingDirectory(self, "Select Folder")
+        if self.folder:
+            self.file_path_edit.setText(self.folder)
+
+
+    def on_split_image_checked(self):
+        if self.split_image_checkbox.isChecked():
+            self.overlap_factor_edit.setEnabled(True)
+        else:
+            self.overlap_factor_edit.setEnabled(False)
 
 class ScaleDialog(QDialog):
     def __init__(self):
@@ -260,7 +343,36 @@ class CrackApp(QMainWindow):
         pass
 
     def export_as_annotation(self):
-        pass
+        # launch the option dialog
+        dialog = ConfigDialog()
+        if dialog.exec():
+            # get parameters
+            mask_img_path = self.output_binary_mask
+            image_path = self.image_path
+            dest_folder = dialog.folder
+            overlap = float(dialog.overlap_factor_edit.text())
+            w_train = int(dialog.width_edit.text())
+            h_train = int(dialog.height_edit.text())
+            prefix = dialog.prefix_edit.text()
+            i = dialog.annotation_combobox.currentIndex()
+            if i==0:
+                as_box = True
+            else:
+                as_box = False
+
+            save_mask = dialog.save_mask_check.isChecked()
+
+            if dialog.split_image_checkbox.isChecked():
+                # split rgb
+                seg.split_image(image_path, dest_folder, w_train, h_train, overlap, prefix=prefix)
+
+                # split binary
+                mask_splits, names = seg.split_image(mask_img_path, dest_folder, w_train, h_train, overlap, prefix=prefix+'_mask', save=save_mask)
+
+                # save_txt files for each split:
+                for i, split in enumerate(mask_splits):
+                    txt_path = os.path.join(dest_folder, names[i][:-4] + '.txt')
+                    seg.convert_bin_mask_to_yolo_txt(split, txt_path, as_box=as_box)
 
 
     # paint and erase __________________________________________
@@ -317,6 +429,7 @@ class CrackApp(QMainWindow):
                 self.pushButton_show_skel.setEnabled(True)
                 self.pushButton_show_mask.setChecked(True)
                 self.actionMeasure_path.setEnabled(True)
+                self.actionExport_as_annotation.setEnabled(True)
 
                 self.has_mask = True
                 self.update_view()
@@ -499,6 +612,7 @@ class CrackApp(QMainWindow):
         self.pushButton_show_mask.setEnabled(True)
         self.pushButton_show_skel.setEnabled(True)
         self.pushButton_show_mask.setChecked(True)
+        self.actionExport_as_annotation.setEnabled(True)
 
         self.actionMeasure_path.setEnabled(True)
 
@@ -518,7 +632,8 @@ class CrackApp(QMainWindow):
 
         i, num_slices = extract_numbers(text)
         print(i, num_slices)
-        self.update_progress(text=f'Segmenting slice {i}/{num_slices}', nb=i/num_slices*100)
+        self.update_progress(text=f'Segmenting slice {i}/{num_slices}', nb=i / num_slices * 100)
+
     def onOutput(self, text):
         if text == 'read':
             # Handle 'read' emission here
