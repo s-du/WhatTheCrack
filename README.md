@@ -18,13 +18,13 @@ The app offers the following key features:
     - Integration with YOLO V8 and SAHI for cutting-edge image processing
     - Segmentation results can be completed with manual painting
 - Simple 'painting' solution to quickly annotate cracks
-    - Modification of proposed segmentation (from YOLO)
-    - Annotate images easily for cracks
-    - Export annotations (as Bboxes or instance segmentation, with chosen resolution)
-    - Automated image spliting for exporting annotation (sliding window)
+    - Annotate cracks intuitively
+    - Modify the proposed segmentation if needed
+    - Export custom annotations (as Bboxes or instance segmentation, with chosen resolution and sliding window)
 - Graph analysis for crack structure determination (NetworkX)
   - Identification of end points and junctions
-  - Measurement of the exact length of all cracks, based on the computed structure   
+  - Measurement of the exact length of all cracks, based on the computed structure   x
+  - Export skeletons as DXF
 
 ## Files and Structure
 - `resources/`: Contains essential resources for the application.
