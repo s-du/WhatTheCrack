@@ -1,6 +1,7 @@
 <p align="center">
-    <a href="https://ibb.co/tpP370H"><img src="https://i.ibb.co/Tv27JMC/Whatthecrack3.png" alt="Whatthecrack2" border="0" style="width: 100%;"></a>
+    <a href=""><img src="https://i.ibb.co/T0bz4XP/Whatthecrack4.png" alt="Whatthecrack2" border="0" style="width: 100%;"></a>
 </p>
+
 
 ## Overview
 WhatTheCrack is a intuitive tool designed for detecting cracks in construction materials. This application leverages the capabilities of YOLO V8 and SAHI, providing users with an intuitive graphical interface for straightforward measurements.
@@ -23,7 +24,7 @@ The app offers the following key features:
 ## Files and Structure
 - `resources/`: Contains essential resources for the application.
 - `sahi/`: Modified SAHI module for image segmentation and analysis.
-- `crackify.ui`: The user interface file for the application.
+- `interface.ui`: The user interface file for the application.
 - `main.py`: The main Python script for running the application.
 - `segment_engine.py`: Handles the segmentation logic.
 - `widgets.py`: Defines Pyside6 widgets and UI components.
