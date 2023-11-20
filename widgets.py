@@ -379,12 +379,12 @@ class PhotoViewer(QGraphicsView):
             self.setSceneRect(rect)
             if self.has_photo():
                 unity = self.transform().mapRect(QRectF(0, 0, 1, 1))
-                print('unity: ', unity)
+                # print('unity: ', unity)
                 self.scale(1 / unity.width(), 1 / unity.height())
                 viewrect = self.viewport().rect()
-                print('view: ', viewrect)
+                # print('view: ', viewrect)
                 scenerect = self.transform().mapRect(rect)
-                print('scene: ', viewrect)
+                # print('scene: ', viewrect)
                 factor = min(viewrect.width() / scenerect.width(),
                              viewrect.height() / scenerect.height())
                 self.scale(factor, factor)
@@ -392,7 +392,6 @@ class PhotoViewer(QGraphicsView):
 
     def clean_scene(self):
         for item in self._scene.items():
-            print(type(item))
             if isinstance(item, QGraphicsEllipseItem):
                 self._scene.removeItem(item)
             elif isinstance(item, QGraphicsPolygonItem):
@@ -400,25 +399,22 @@ class PhotoViewer(QGraphicsView):
 
     def clean_scene_line(self):
         for item in self._scene.items():
-            print(type(item))
             if isinstance(item, QGraphicsLineItem):
                 self._scene.removeItem(item)
 
     def clean_scene_poly(self):
         for item in self._scene.items():
-            print(type(item))
+            # print(type(item))
             if isinstance(item, QGraphicsPolygonItem):
                 self._scene.removeItem(item)
 
     def clean_scene_text(self):
         for item in self._scene.items():
-            print(type(item))
             if isinstance(item, QGraphicsTextItem):
                 self._scene.removeItem(item)
 
     def clean_scene_path(self):
         for item in self._scene.items():
-            print(type(item))
             if isinstance(item, QGraphicsPathItem):
                 self._scene.removeItem(item)
 
@@ -448,7 +444,7 @@ class PhotoViewer(QGraphicsView):
         self.cursor_diameter = diameter
 
         scale_factor = self.transform().m11()
-        print(f'scale factor: {scale_factor}')
+        # print(f'scale factor: {scale_factor}')
         scaledDiameter = diameter * scale_factor
 
         pixmap = QPixmap(scaledDiameter, scaledDiameter)
@@ -515,7 +511,7 @@ class PhotoViewer(QGraphicsView):
 
                 # initial cursor size
                 self.prefered_cursor_diam = int(self.scene().width() / 75)
-                print(f'initial brush diam: {self.prefered_cursor_diam}')
+                # print(f'initial brush diam: {self.prefered_cursor_diam}')
                 self.brush_cur = self.create_circle_cursor(self.prefered_cursor_diam)
 
         else:
@@ -563,7 +559,6 @@ class PhotoViewer(QGraphicsView):
     def get_coord(self, QGraphicsRect):
         rect = QGraphicsRect.rect()
         coord = [rect.topLeft(), rect.bottomRight()]
-        print(coord)
 
         return coord
 
@@ -624,7 +619,7 @@ class PhotoViewer(QGraphicsView):
         text_item.setFont(font)
 
     def update_all_text_size(self):
-        print(f'update font size: {self.text_font_size}')
+        # print(f'update font size: {self.text_font_size}')
         for item in self._scene.items():
             if isinstance(item, QGraphicsTextItem):
                 font = QFont()
@@ -637,7 +632,7 @@ class PhotoViewer(QGraphicsView):
                 # item.setPos(mid_x - text_width / 2, mid_y - text_height / 2)
 
     def update_all_line_size(self):
-        print(f'update line size: {self.line_size}')
+        # print(f'update line size: {self.line_size}')
         for item in self._scene.items():
             if isinstance(item, QGraphicsLineItem) or isinstance(item, QGraphicsPathItem):
                 self.pen_yolo.setWidth(self.line_size)
@@ -718,7 +713,7 @@ class PhotoViewer(QGraphicsView):
                     self.change_to_brush_cursor()
 
                     # adapt brush drawing size:
-                    print(self.prefered_cursor_diam)
+                    # print(self.prefered_cursor_diam)
                     self.brush.setWidth(self.prefered_cursor_diam)
                     self.eraser_brush.setWidth(self.prefered_cursor_diam)
 
@@ -800,7 +795,7 @@ class PhotoViewer(QGraphicsView):
         elif event.button() == Qt.RightButton:
             if self.has_photo():
                 self.right_mouse_pressed = True
-                print('right click!')
+                # print('right click!')
 
         elif event.button() == Qt.MiddleButton:
             self.middle_mouse_pressed = True
@@ -897,7 +892,7 @@ class PhotoViewer(QGraphicsView):
             if self._current_line_item is not None:
                 # emit signal (end of measure)
                 self.endDrawing_line_meas.emit(self._current_line_item, self._current_text_item)
-                print('Line meas. added')
+                print('Line measurement added')
 
             self.origin = QPoint()
             self._current_line_item = None
@@ -925,7 +920,7 @@ class PhotoViewer(QGraphicsView):
                 coords = coords[(coords[:, 0] >= 0) & (coords[:, 1] >= 0)]
 
                 self.endPainting.emit(coords)
-                # print(f'brush ROI added, {coords}')
+                print(f'Brush ROI added')
 
                 # remove path
                 self._scene.removeItem(self._current_path_item)

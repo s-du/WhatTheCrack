@@ -221,7 +221,7 @@ class CrackApp(QMainWindow):
 
         basepath = os.path.dirname(__file__)
         basename = 'interface'
-        uifile = os.path.join(basepath, '%s.ui' % basename)
+        uifile = os.path.join(basepath, 'ui/%s.ui' % basename)
         wid.loadUi(uifile, self)
 
         self.setWindowTitle("What the crack!")
@@ -589,7 +589,7 @@ class CrackApp(QMainWindow):
         dialog = ScaleDialog()
         if dialog.exec_():
             self.resolution = dialog.resolution
-            print(f'New resolution is {self.resolution} mm/pixel')
+            print(f'The new resolution is {self.resolution} mm/pixel')
             self.viewer.mm_per_pixel = self.resolution
 
             self.toggle_all_meas()
@@ -650,7 +650,7 @@ class CrackApp(QMainWindow):
         try:
             img = QFileDialog.getOpenFileName(self, u"Ouverture de fichiers", "",
                                               "Image Files (*.png *.jpg *.JPEG *.bmp *.tif)")
-            print(f'the following image will be loaded {img[0]}')
+            print(f'The following image will be loaded {img[0]}')
         except:
             pass
         if img[0] != '':
@@ -761,7 +761,7 @@ def main(argv=None):
         bg_color = palette.color(QPalette.Window)
 
         is_dark_theme = bg_color.lightness() < 128
-        print(is_dark_theme)
+        print(f'Windows dark theme: {is_dark_theme}')
 
         if is_dark_theme:
             app.setStyleSheet("""
@@ -789,7 +789,7 @@ def main(argv=None):
             """)
 
     # create the main window
-
+    print('Launching the application')
     window = CrackApp(is_dark_theme)
     window.showMaximized()
 

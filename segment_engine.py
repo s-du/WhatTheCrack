@@ -37,7 +37,6 @@ def get_segmentation_result(helper, img_path):
 
 def create_binary_from_yolo(result):
     first_mask = result.object_prediction_list[0]
-    print(first_mask)
     mask = np.asarray(first_mask.mask.bool_mask)
     combined_mask = mask
 
@@ -122,20 +121,15 @@ def find_path(img, x, y, junctions, endpoints):
         return []
 
     def dfs(start_x, start_y, visited):
-        print(start_x, start_y)
         if not (0 <= start_x < img.shape[0] and 0 <= start_y < img.shape[1]):
             return []
         if img[start_x, start_y] == 0:
-            print('Zero!')
             return []
         if (start_x, start_y) in visited:
-            print('Visited!')
             return []
         if is_node(start_x, start_y, junctions):
-            print('reach junction!___________________________')
             return [(start_x, start_y)]
         if is_node(start_x, start_y, endpoints):
-            print('reach end point!___________________________')
             return [(start_x, start_y)]
 
         visited.add((start_x, start_y))
@@ -167,9 +161,9 @@ def find_path(img, x, y, junctions, endpoints):
 
     # Perform DFS in two different directions
     path1 = dfs(neighbors[0][0], neighbors[0][1], set([(x, y)]))
-    print(path1)
+
     path2 = dfs(neighbors[1][0], neighbors[1][1], set([(x, y)]))
-    print(path2)
+
 
     # Combine the paths with the starting point in the middle
     combined_path = path1[::-1] + [(x, y)] + path2
@@ -294,7 +288,6 @@ def build_graph_old(junctions, endpoints, skel):
     visited_junctions = set(tuple(p) for p in junctions)
 
     for endpoint in endpoints:
-        print(f'endpoint: {endpoint}')
         start = tuple(endpoint)
         queue = [start]
         path = [start]
@@ -302,7 +295,6 @@ def build_graph_old(junctions, endpoints, skel):
 
         while queue:
             current = queue.pop(0)
-            print(f'current; {current}')
             if current != start and (current in visited_junctions or current in set(map(tuple, endpoints))):
                 # Found a junction or another endpoint, add the edge
                 G.add_edge(start, current, path=path.copy())
