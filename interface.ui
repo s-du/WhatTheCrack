@@ -261,6 +261,37 @@
      <height>26</height>
     </rect>
    </property>
+   <widget class="QMenu" name="menuFile">
+    <property name="title">
+     <string>File</string>
+    </property>
+    <addaction name="actionLoad_image"/>
+   </widget>
+   <widget class="QMenu" name="menuMeasure">
+    <property name="title">
+     <string>Measure</string>
+    </property>
+    <addaction name="actionMeasure"/>
+    <addaction name="actionMeasure_path"/>
+   </widget>
+   <widget class="QMenu" name="menuPaint">
+    <property name="title">
+     <string>Paint</string>
+    </property>
+    <addaction name="actionPaint_mask"/>
+    <addaction name="actionEraser_mask"/>
+   </widget>
+   <widget class="QMenu" name="menuExport">
+    <property name="title">
+     <string>Export</string>
+    </property>
+    <addaction name="actionExport_dxf"/>
+    <addaction name="actionExport_as_annotation"/>
+   </widget>
+   <addaction name="menuFile"/>
+   <addaction name="menuMeasure"/>
+   <addaction name="menuPaint"/>
+   <addaction name="menuExport"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
   <widget class="QToolBar" name="toolBar">
@@ -368,6 +399,19 @@
    </property>
    <property name="text">
     <string>Eraser Mask</string>
+   </property>
+  </action>
+  <action name="actionExport_dxf">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>Export dxf</string>
+   </property>
+  </action>
+  <action name="actionExport_as_annotation">
+   <property name="text">
+    <string>Export as annotation</string>
    </property>
   </action>
  </widget>

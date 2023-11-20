@@ -137,7 +137,7 @@ class CrackApp(QMainWindow):
         super().__init__()
 
         basepath = os.path.dirname(__file__)
-        basename = 'crackify'
+        basename = 'interface'
         uifile = os.path.join(basepath, '%s.ui' % basename)
         wid.loadUi(uifile, self)
 
@@ -191,6 +191,9 @@ class CrackApp(QMainWindow):
         self.actionHand_selector.triggered.connect(self.hand_pan)
         self.actionPaint_mask.triggered.connect(self.paint_mask)
         self.actionEraser_mask.triggered.connect(self.erase_mask)
+        # export actions
+        self.actionExport_dxf.triggered.connect(self.export_dxf)
+        self.actionExport_as_annotation.triggered.connect(self.export_as_annotation)
 
         # pushbuttons
         self.pushButton_show_image.clicked.connect(self.update_view)
@@ -251,6 +254,14 @@ class CrackApp(QMainWindow):
                 self.progressBar.setVisible(False)
             elif self.progressBar.isHidden():
                 self.progressBar.setVisible(True)
+
+    # export functions
+    def export_dxf(self):
+        pass
+
+    def export_as_annotation(self):
+        pass
+
 
     # paint and erase __________________________________________
     def paint_mask(self):

@@ -917,13 +917,15 @@ class PhotoViewer(QGraphicsView):
 
                 limit_row = int(top_left.x())
                 limit_col = int(top_left.y())
-                print(f'limits = {limit_row}, {limit_col}')
 
                 coords[:, 0] += limit_col
                 coords[:, 1] += limit_row
 
+                # Remove rows with negative coordinates
+                coords = coords[(coords[:, 0] >= 0) & (coords[:, 1] >= 0)]
+
                 self.endPainting.emit(coords)
-                print('brush ROI added')
+                # print(f'brush ROI added, {coords}')
 
                 # remove path
                 self._scene.removeItem(self._current_path_item)

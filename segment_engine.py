@@ -188,26 +188,47 @@ def highlight_path(img_shape, path):
 
 
 def create_mask_from_paint(img, coords):
+    # Get the dimensions of the image
+    height, width = img.shape[:2]
+
+    # Filter out coordinates that are outside the image bounds
+    valid_coords = (coords[:, 0] >= 0) & (coords[:, 0] < height) & \
+                   (coords[:, 1] >= 0) & (coords[:, 1] < width)
+    filtered_coords = coords[valid_coords]
+
     # Set the corresponding pixels to white
-    img[coords[:, 0], coords[:, 1]] = 255
+    img[filtered_coords[:, 0], filtered_coords[:, 1]] = 255
 
     return img
 
 
 def remove_mask_from_paint(img, coords):
+    # Get the dimensions of the image
+    height, width = img.shape[:2]
+
+    # Filter out coordinates that are outside the image bounds
+    valid_coords = (coords[:, 0] >= 0) & (coords[:, 0] < height) & \
+                   (coords[:, 1] >= 0) & (coords[:, 1] < width)
+    filtered_coords = coords[valid_coords]
+
     # Set the corresponding pixels to white
-    img[coords[:, 0], coords[:, 1]] = 0
+    img[filtered_coords[:, 0], filtered_coords[:, 1]] = 0
 
     return img
 
 
-# NEW METHOD FOR SKELETON GRAPH
+
 def build_graph(junctions, endpoints, skel):
     G = nx.Graph()
 
     # Add junctions and endpoints as nodes
     for point in np.vstack([junctions, endpoints]):
         G.add_node(tuple(point))
+
+    # Helper function to check if a point is within the image bounds
+    def is_within_bounds(pos, shape):
+        y, x = pos
+        return 0 <= y < shape[0] and 0 <= x < shape[1]
 
     # Helper function to get neighbors
     def get_neighbors(pos):
@@ -216,7 +237,8 @@ def build_graph(junctions, endpoints, skel):
             (y - 1, x), (y + 1, x), (y, x - 1), (y, x + 1),
             (y - 1, x - 1), (y - 1, x + 1), (y + 1, x - 1), (y + 1, x + 1)
         ]
-        return [n for n in neighbors if skel[n] == 255]
+        valid_neighbors = [n for n in neighbors if is_within_bounds(n, skel.shape) and skel[n] == 255]
+        return valid_neighbors
 
     # Function to run BFS and add edges
     def add_edges_from_node(start):
