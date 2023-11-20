@@ -13,13 +13,18 @@ WhatTheCrack is a intuitive tool designed for detecting cracks in construction m
 ## Features
 The app offers the following key features:
 - User-friendly GUI for simple measurements.
-- Simple 'painting' solution to quickly annotate cracks
 - Advanced crack segmentation on construction materials.
-  - Integration with YOLO V8 and SAHI for cutting-edge image processing.
-  - Segmentation results can be completed with manual painting
+    - Instance segmentation
+    - Integration with YOLO V8 and SAHI for cutting-edge image processing
+    - Segmentation results can be completed with manual painting
+- Simple 'painting' solution to quickly annotate cracks
+    - Annotate cracks intuitively
+    - Modify the proposed segmentation if needed
+    - Export custom annotations (as Bboxes or instance segmentation, with chosen resolution and sliding window)
 - Graph analysis for crack structure determination (NetworkX)
   - Identification of end points and junctions
-  - Measurement of the exact length of all cracks, based on the computed structure   
+  - Measurement of the exact length of all cracks, based on the computed structure   x
+  - Export skeletons as DXF
 
 ## Files and Structure
 - `resources/`: Contains essential resources for the application.
