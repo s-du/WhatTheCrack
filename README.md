@@ -78,13 +78,4 @@ Contributions to the WhatTheCrack App are welcome! If you find any bugs, have su
 4. Push your changes to your fork.
 5. Submit a pull request describing your changes.
 
-## License
-(Information about the project's license, if applicable.)
 
-## Acknowledgements
-(Credits to any contributors, third-party libraries, or other resources used in the project.)
-
-## Languages
-- Python&#8203;``【oaicite:0】``&#8203;
-
-(Note: Please update each section with specific details pertinent to the WhatTheCrack project.)
