@@ -303,6 +303,7 @@ class CrackApp(QMainWindow):
             suf2 = '_white'
         else:
             suf = ''
+            suf2 = ''
 
         self.add_icon(res.find(f'img/camera{suf}.png'), self.actionLoad_image)
         self.add_icon(res.find(f'img/crack{suf}.png'), self.actionSegment)
